@@ -13,6 +13,7 @@ Planned use
 -----------
 
 server:
+
     from redis_rpc import RedisRPC
 
     def func1(arg1, arg2):
@@ -24,6 +25,7 @@ server:
 
 
 client:
+
     from redis_rpc import RedisRPC
 
     redis = StrictRedis.from_url(...)
@@ -31,8 +33,8 @@ client:
     print(rpc.call('func1', arg1=1, arg2=2))
 
 
-Protocol [loose notes]
-----------------------
+Protocol
+--------
 
 JSON.
 
@@ -44,15 +46,16 @@ avoid starvation.
 
 Queues:
 
-- "<prefix>:<func>:calls"
-- "<prefix>:<func>:result:<call-id>"
+- "{prefix}:{func}:calls"
+- "{prefix}:{func}:result:{call-id}"
 
 Call message:
-   {"id": "<uuid>",  # <- random, client-assigned
-    "ts": "<time-stamp-iso8601>",
-    "kw": {"arg1": "value1",
-           "arg2": ["some", "list", "of", "values"]}
-   }
+
+    {"id": "{uuid}",  # random, client-assigned
+     "ts": "{time-stamp-iso8601}",
+     "kw": {"arg1": "value1",
+            "arg2": ["some", "list", "of", "values"]}
+    }
 
 Call is sent to a queue specific to a particular function, so there is
 no need to additionally put function name in the message itself.
@@ -64,12 +67,14 @@ author of request handlers to make sure exposed API will be usable for
 planned clients.
 
 Result message:
-   # if successfull
-   {"ts": "<time-stamp-iso8601>",
-    "res": <result-value>}
-   # after exception
-   {"ts": "<time-stamp-iso8601>",
-    "exc": <exception-string>}
+
+    # if successfull
+    {"ts": "{time-stamp-iso8601}",
+     "res": {result-value}}
+
+    # or, if finished with an exception
+    {"ts": "{time-stamp-iso8601}",
+     "exc": {exception-string}}
 
 
 Potential future
