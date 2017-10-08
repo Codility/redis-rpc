@@ -1,6 +1,8 @@
 Experiment: proof-of-concept minimal RPC-over-Redis
 ===================================================
 
+[![Build Status](https://travis-ci.org/marcinkaszynski/redis-rpc.svg?branch=master)](https://travis-ci.org/marcinkaszynski/redis-rpc)
+
 Goals:
 
 - simple
