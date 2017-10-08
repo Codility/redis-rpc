@@ -10,5 +10,6 @@ setup(
     author_email='marcin.kaszynski@gmail.com',
     url='https://github.com/marcinkaszynski/redis-rpc',
     setup_requires=['pytest-runner'],
+    install_requires=['redis'],
     tests_require=['pytest', 'pytest-redis']
 )

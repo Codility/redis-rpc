@@ -1,5 +1,6 @@
 import json
 import logging
+import signal
 from datetime import datetime
 from uuid import uuid4
 
@@ -21,11 +22,13 @@ class RedisRPC:
         self._prefix = prefix
 
     def serve(self, func_map):
+        self._quit = False
+        signal.signal(signal.SIGTERM, self.termination_signal)
+        signal.signal(signal.SIGINT, self.termination_signal)
+
         queue_map = {self.call_queue_name(func_name): (func_name, func)
                      for (func_name, func) in func_map.items()}
-
-        # TODO: clean signal handling/termination
-        while True:
+        while not self._quit:
             self.serve_one(queue_map)
 
     def serve_one(self, queue_map):
@@ -81,3 +84,7 @@ class RedisRPC:
 
     def response_queue_name(self, func_name, req_id):
         return ('%s:%s:result:%s' % (self._prefix, func_name, req_id)).encode('utf-8')
+
+    def termination_signal(self, signum, frame):
+        logging.info('Received %s, will quit.', signal.Signals(signum).name)
+        self._quit = True
