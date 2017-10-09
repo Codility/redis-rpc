@@ -31,6 +31,13 @@ def rotated(l, places):
     return l[places:] + l[:places]
 
 
+def warn_if_no_socket_timeout(redis):
+    if redis.connection_pool.connection_kwargs.get('socket_timeout') is None:
+        logging.warning('RPC: Redis instance does not set socket_timeout.  '
+                        'This means potential trouble in case of network '
+                        'problems between Redis and RPC client or server.')
+
+
 class Scripts:
 
     RPUSH_EX = ("redis.call('rpush', KEYS[1], ARGV[1]);"
@@ -53,6 +60,7 @@ class Client:
         self._scripts = Scripts(redis)
         self._expire = request_expire
         self._blpop_timeout = blpop_timeout
+        warn_if_no_socket_timeout(redis)
 
     def call_async(self, func_name, **kwargs):
         req_id = str(uuid4())
@@ -98,6 +106,7 @@ class Server:
                            for (name, func) in func_map.items()}
         self._queue_names = list(self._queue_map.keys())
         self._call_idx = 0
+        warn_if_no_socket_timeout(redis)
 
     def serve(self):
         self._quit = False

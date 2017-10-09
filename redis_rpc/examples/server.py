@@ -16,7 +16,7 @@ def rpc_get(k):
 
 
 def main():
-    redis = StrictRedis.from_url("redis://localhost:6379/0")
+    redis = StrictRedis.from_url("redis://localhost:6379/0", socket_timeout=10)
     srv = Server(redis, {'set': rpc_set, 'get': rpc_get}, 'rpc_example')
     srv.serve()
 

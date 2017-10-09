@@ -6,7 +6,7 @@ from redis_rpc import Client
 
 
 def main():
-    redis = StrictRedis.from_url("redis://localhost:6379/0")
+    redis = StrictRedis.from_url("redis://localhost:6379/0", socket_timeout=10)
     cli = Client(redis, 'rpc_example')
 
     if sys.argv[1] == 'get':
