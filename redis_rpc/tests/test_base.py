@@ -76,7 +76,8 @@ def test_server_rotates_queues():
     mockredis = Mock()
     mockredis.blpop.return_value = None
 
-    last_call_queues = lambda: list(mockredis.blpop.call_args[0][0])
+    def last_call_queues():
+        return list(mockredis.blpop.call_args[0][0])
 
     srv = Server(mockredis, funcs)
     srv.serve_one()
@@ -95,4 +96,3 @@ def test_server_rotates_queues():
     assert last_call_queues() == [b'redis_rpc:a:calls',
                                   b'redis_rpc:b:calls',
                                   b'redis_rpc:c:calls']
-
