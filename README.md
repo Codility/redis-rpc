@@ -29,8 +29,8 @@ server:
         return arg1 + arg2
 
     redis = StrictRedis.from_url(...)
-    srv = redis_rpc.Server(redis, prefix)
-    srv.serve({'func1': func1, 'func2': func2, ...})
+    srv = redis_rpc.Server(redis, {'f1': func1, 'f2': func2, ...}, prefix)
+    srv.serve()
 
 
 client:
@@ -39,7 +39,7 @@ client:
 
     redis = StrictRedis.from_url(...)
     cli = redis_rpc.Client(redis, prefix)
-    print(cli.call('func1', arg1=1, arg2=2))
+    print(cli.call('f1', arg1=1, arg2=2))
 
 
 Protocol

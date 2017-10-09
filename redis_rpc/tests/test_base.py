@@ -11,8 +11,8 @@ from unittest.mock import Mock
 def rpc_server(redis, func_map, **kwargs):
 
     def server():
-        rpc = Server(redis, **kwargs)
-        rpc.serve(func_map)
+        rpc = Server(redis, func_map, **kwargs)
+        rpc.serve()
 
     rpc_proc = Process(target=server)
     rpc_proc.start()

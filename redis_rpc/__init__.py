@@ -41,11 +41,13 @@ class Scripts:
 
 class Client:
     def __init__(self, redis, prefix='redis_rpc',
-                 request_expire=REQUEST_EXPIRE):
+                 request_expire=REQUEST_EXPIRE,
+                 blpop_timeout=BLPOP_TIMEOUT):
         self._redis = redis
         self._prefix = prefix
         self._scripts = Scripts(redis)
         self._expire = request_expire
+        self._blpop_timeout = blpop_timeout
 
     def call_async(self, func_name, **kwargs):
         req_id = str(uuid4())
@@ -61,7 +63,7 @@ class Client:
     def response(self, func_name, req_id):
         # TODO: wait longer than BLPOP_TIMEOUT
         qn = response_queue_name(self._prefix, func_name, req_id)
-        popped = self._redis.blpop([qn], BLPOP_TIMEOUT)
+        popped = self._redis.blpop([qn], self._blpop_timeout)
         if popped is None:
             raise RPCTimeout()
 
@@ -77,30 +79,35 @@ class Client:
 
 
 class Server:
-    def __init__(self, redis, prefix='redis_rpc', result_expire=RESULT_EXPIRE):
+    def __init__(self, redis, func_map,
+                 prefix='redis_rpc',
+                 result_expire=RESULT_EXPIRE,
+                 blpop_timeout=BLPOP_TIMEOUT):
         self._redis = redis
         self._prefix = prefix
         self._scripts = Scripts(redis)
         self._expire = result_expire
+        self._blpop_timeout = blpop_timeout
+        self._func_map = func_map
+        self._queue_map = {call_queue_name(self._prefix, name): (name, func)
+                           for (name, func) in func_map.items()}
 
-    def serve(self, func_map):
+    def serve(self):
         self._quit = False
         signal.signal(signal.SIGTERM, self.termination_signal)
         signal.signal(signal.SIGINT, self.termination_signal)
 
-        queue_map = {call_queue_name(self._prefix, name): (name, func)
-                     for (name, func) in func_map.items()}
         while not self._quit:
-            self.serve_one(queue_map)
+            self.serve_one()
 
-    def serve_one(self, queue_map):
+    def serve_one(self):
         # TODO: rotate the order of queues in blpop to avoid starvation
-        popped = self._redis.blpop(queue_map.keys(), BLPOP_TIMEOUT)
+        popped = self._redis.blpop(self._queue_map.keys(), self._blpop_timeout)
         if popped is None:
             return
 
         (queue, req_str) = popped
-        (func_name, func) = queue_map[queue]
+        (func_name, func) = self._queue_map[queue]
         try:
             req = json.loads(req_str)
         except Exception as e:
