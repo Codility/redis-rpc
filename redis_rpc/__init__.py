@@ -16,7 +16,43 @@ class RemoteException(Exception):
     pass
 
 
-class RedisRPC:
+def call_queue_name(prefix, func_name):
+    return ('%s:%s:calls' % (prefix, func_name)).encode('utf-8')
+
+
+def response_queue_name(prefix, func_name, req_id):
+    return ('%s:%s:result:%s' % (prefix, func_name, req_id)).encode('utf-8')
+
+
+class Client:
+    def __init__(self, redis, prefix='redis_rpc'):
+        self._redis = redis
+        self._prefix = prefix
+
+    def call(self, func_name, **kwargs):
+        req_id = str(uuid4())
+        msg = {'id': req_id,
+               'ts': datetime.now().isoformat()}
+        msg['kw'] = kwargs
+        self._redis.rpush(call_queue_name(self._prefix, func_name),
+                          json.dumps(msg))
+
+        # TODO: wait longer than BLPOP_TIMEOUT
+        qn = response_queue_name(self._prefix, func_name, req_id)
+        popped = self._redis.blpop([qn], BLPOP_TIMEOUT)
+        if popped is None:
+            raise RPCTimeout()
+
+        (_, res_bytes) = popped
+        res = json.loads(res_bytes)
+
+        if res.get('exc'):
+            raise RemoteException(res['exc'])
+
+        return res.get('res')
+
+
+class Server:
     def __init__(self, redis, prefix='redis_rpc'):
         self._redis = redis
         self._prefix = prefix
@@ -26,8 +62,8 @@ class RedisRPC:
         signal.signal(signal.SIGTERM, self.termination_signal)
         signal.signal(signal.SIGINT, self.termination_signal)
 
-        queue_map = {self.call_queue_name(func_name): (func_name, func)
-                     for (func_name, func) in func_map.items()}
+        queue_map = {call_queue_name(self._prefix, name): (name, func)
+                     for (name, func) in func_map.items()}
         while not self._quit:
             self.serve_one(queue_map)
 
@@ -56,34 +92,8 @@ class RedisRPC:
     def send_result(self, func_name, req_id, **kwargs):
         msg = {'ts': datetime.now().isoformat()}
         msg.update(kwargs)
-        self._redis.rpush(self.response_queue_name(func_name, req_id), json.dumps(msg))
-
-    def call(self, func_name, **kwargs):
-        req_id = str(uuid4())
-        msg = {'id': req_id,
-               'ts': datetime.now().isoformat()}
-        msg['kw'] = kwargs
-        self._redis.rpush(self.call_queue_name(func_name), json.dumps(msg))
-
-        # TODO: wait longer than BLPOP_TIMEOUT
-        qn = self.response_queue_name(func_name, req_id)
-        popped = self._redis.blpop([qn], BLPOP_TIMEOUT)
-        if popped is None:
-            raise RPCTimeout()
-
-        (_, res_bytes) = popped
-        res = json.loads(res_bytes)
-
-        if res.get('exc'):
-            raise RemoteException(res['exc'])
-
-        return res.get('res')
-
-    def call_queue_name(self, func_name):
-        return ('%s:%s:calls' % (self._prefix, func_name)).encode('utf-8')
-
-    def response_queue_name(self, func_name, req_id):
-        return ('%s:%s:result:%s' % (self._prefix, func_name, req_id)).encode('utf-8')
+        self._redis.rpush(response_queue_name(self._prefix, func_name, req_id),
+                          json.dumps(msg))
 
     def termination_signal(self, signum, frame):
         logging.info('Received %s, will quit.', signal.Signals(signum).name)

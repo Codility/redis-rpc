@@ -1,14 +1,14 @@
 import pytest
 from contextlib import contextmanager
 from multiprocessing import Process
-from redis_rpc import RedisRPC, RemoteException, RPCTimeout
+from redis_rpc import Client, Server, RemoteException, RPCTimeout
 
 
 @contextmanager
 def rpc_server(redis, func_map):
 
     def server():
-        rpc = RedisRPC(redis)
+        rpc = Server(redis)
         rpc.serve(func_map)
 
     rpc_proc = Process(target=server)
@@ -30,7 +30,7 @@ def test_client_server(redisdb):
     def fset(k, v):
         data[k] = v
 
-    cli = RedisRPC(redisdb)
+    cli = Client(redisdb)
 
     with pytest.raises(RPCTimeout):
         cli.call('get', k='k0')
