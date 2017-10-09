@@ -1,7 +1,7 @@
 #!env python3
 
 from redis import StrictRedis
-from redis_rpc import RedisRPC
+from redis_rpc import Server
 
 
 VALUES = {}
@@ -17,7 +17,7 @@ def rpc_get(k):
 
 def main():
     redis = StrictRedis.from_url("redis://localhost:6379/0")
-    rpc = RedisRPC(redis, 'rpc_example')
+    rpc = Server(redis, 'rpc_example')
     rpc.serve({'set': rpc_set, 'get': rpc_get})
 
 

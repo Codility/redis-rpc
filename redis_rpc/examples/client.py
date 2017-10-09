@@ -2,12 +2,12 @@
 
 import sys
 from redis import StrictRedis
-from redis_rpc import RedisRPC
+from redis_rpc import Client
 
 
 def main():
     redis = StrictRedis.from_url("redis://localhost:6379/0")
-    rpc = RedisRPC(redis, 'rpc_example')
+    rpc = Client(redis, 'rpc_example')
 
     if sys.argv[1] == 'get':
         print(rpc.call('get', k=sys.argv[2]))
