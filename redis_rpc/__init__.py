@@ -26,16 +26,17 @@ def response_queue_name(prefix, func_name, req_id):
     return ('%s:%s:result:%s' % (prefix, func_name, req_id)).encode('utf-8')
 
 
-def rpush_ex(redis, queue, msg, expire):
-    # It feels a bit like we should have an atomic
-    # rpush-and-expire operation, but it shouldn't matter much.
-    # This will work well even if other processes modify the list
-    # between these calls to `rpush` and `expire`.
-    #
-    # It is up to developers to ensure expiry times are consistent
-    # between clients to the degree they need to be.
-    redis.rpush(queue, msg)
-    redis.expire(queue, expire)
+class Scripts:
+
+    RPUSH_EX = ("redis.call('rpush', KEYS[1], ARGV[1]);"
+                "redis.call('expire', KEYS[1], ARGV[2])")
+
+    def __init__(self, redis):
+        self.redis = redis
+        self._rpush_ex = redis.register_script(self.RPUSH_EX)
+
+    def rpush_ex(self, queue, msg, expire):
+        self._rpush_ex(keys=[queue], args=[msg, expire])
 
 
 class Client:
@@ -43,6 +44,7 @@ class Client:
                  request_expire=REQUEST_EXPIRE):
         self._redis = redis
         self._prefix = prefix
+        self._scripts = Scripts(redis)
         self._expire = request_expire
 
     def call_async(self, func_name, **kwargs):
@@ -51,8 +53,8 @@ class Client:
                'ts': datetime.now().isoformat()}
         msg['kw'] = kwargs
 
-        rpush_ex(self._redis, call_queue_name(self._prefix, func_name),
-                 json.dumps(msg), self._expire)
+        self._scripts.rpush_ex(call_queue_name(self._prefix, func_name),
+                               json.dumps(msg), self._expire)
 
         return req_id
 
@@ -78,6 +80,7 @@ class Server:
     def __init__(self, redis, prefix='redis_rpc', result_expire=RESULT_EXPIRE):
         self._redis = redis
         self._prefix = prefix
+        self._scripts = Scripts(redis)
         self._expire = result_expire
 
     def serve(self, func_map):
@@ -115,9 +118,9 @@ class Server:
     def send_result(self, func_name, req_id, **kwargs):
         msg = {'ts': datetime.now().isoformat()}
         msg.update(kwargs)
-        rpush_ex(self._redis,
-                 response_queue_name(self._prefix, func_name, req_id),
-                 json.dumps(msg), self._expire)
+        self._scripts.rpush_ex(response_queue_name(self._prefix, func_name,
+                                                   req_id),
+                               json.dumps(msg), self._expire)
 
     def termination_signal(self, signum, frame):
         logging.info('Received %s, will quit.', signal.Signals(signum).name)
