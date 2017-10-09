@@ -57,7 +57,6 @@ def test_base_usage(redisdb):
             cli.call('get', unknown_arg='some-value')
 
 
-@pytest.mark.timeout(10)
 def test_expiry_times(redisdb):
     cli = Client(redisdb, request_expire=10)
 
