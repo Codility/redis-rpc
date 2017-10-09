@@ -26,6 +26,11 @@ def response_queue_name(prefix, func_name, req_id):
     return ('%s:%s:result:%s' % (prefix, func_name, req_id)).encode('utf-8')
 
 
+def rotated(l, places):
+    places = places % len(l)
+    return l[places:] + l[:places]
+
+
 class Scripts:
 
     RPUSH_EX = ("redis.call('rpush', KEYS[1], ARGV[1]);"
@@ -91,6 +96,8 @@ class Server:
         self._func_map = func_map
         self._queue_map = {call_queue_name(self._prefix, name): (name, func)
                            for (name, func) in func_map.items()}
+        self._queue_names = list(self._queue_map.keys())
+        self._call_idx = 0
 
     def serve(self):
         self._quit = False
@@ -101,8 +108,9 @@ class Server:
             self.serve_one()
 
     def serve_one(self):
-        # TODO: rotate the order of queues in blpop to avoid starvation
-        popped = self._redis.blpop(self._queue_map.keys(), self._blpop_timeout)
+        popped = self._redis.blpop(rotated(self._queue_names, self._call_idx),
+                                   self._blpop_timeout)
+        self._call_idx += 1
         if popped is None:
             return
 

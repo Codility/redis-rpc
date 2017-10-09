@@ -68,3 +68,31 @@ def test_expiry_times(redisdb):
         while redisdb.ttl(resp_queue) <= 0:
             time.sleep(0.1)
         assert 0 < redisdb.ttl(resp_queue) <= 10
+
+
+def test_server_rotates_queues():
+    funcs = {name: lambda: None
+             for name in ['a', 'b', 'c']}
+    mockredis = Mock()
+    mockredis.blpop.return_value = None
+
+    last_call_queues = lambda: list(mockredis.blpop.call_args[0][0])
+
+    srv = Server(mockredis, funcs)
+    srv.serve_one()
+    assert last_call_queues() == [b'redis_rpc:a:calls',
+                                  b'redis_rpc:b:calls',
+                                  b'redis_rpc:c:calls']
+    srv.serve_one()
+    assert last_call_queues() == [b'redis_rpc:b:calls',
+                                  b'redis_rpc:c:calls',
+                                  b'redis_rpc:a:calls']
+    srv.serve_one()
+    assert last_call_queues() == [b'redis_rpc:c:calls',
+                                  b'redis_rpc:a:calls',
+                                  b'redis_rpc:b:calls']
+    srv.serve_one()
+    assert last_call_queues() == [b'redis_rpc:a:calls',
+                                  b'redis_rpc:b:calls',
+                                  b'redis_rpc:c:calls']
+
