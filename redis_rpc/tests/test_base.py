@@ -1,14 +1,17 @@
 import pytest
+import time
 from contextlib import contextmanager
 from multiprocessing import Process
-from redis_rpc import Client, Server, RemoteException, RPCTimeout
+from redis_rpc import (Client, Server, RemoteException, RPCTimeout,
+                       call_queue_name, response_queue_name)
+from unittest.mock import Mock
 
 
 @contextmanager
-def rpc_server(redis, func_map):
+def rpc_server(redis, func_map, **kwargs):
 
     def server():
-        rpc = Server(redis)
+        rpc = Server(redis, **kwargs)
         rpc.serve(func_map)
 
     rpc_proc = Process(target=server)
@@ -21,15 +24,7 @@ def rpc_server(redis, func_map):
         rpc_proc.join()
 
 
-def test_client_server(redisdb):
-    data = {}
-
-    def fget(k):
-        return data[k]
-
-    def fset(k, v):
-        data[k] = v
-
+def test_base_usage(redisdb):
     cli = Client(redisdb)
 
     with pytest.raises(RPCTimeout):
@@ -38,8 +33,17 @@ def test_client_server(redisdb):
     with pytest.raises(RPCTimeout):
         cli.call('unknown-function')
 
-    with rpc_server(redisdb, {'get': fget, 'set': fset}):
+    data = {}
 
+    def fget(k):
+        return data[k]
+
+    def fset(k, v):
+        data[k] = v
+
+    funcs = {'get': fget, 'set': fset}
+
+    with rpc_server(redisdb, funcs):
         assert cli.call('set', k='k1', v=123) is None
         assert cli.call('get', k='k1') == 123
 
@@ -51,3 +55,17 @@ def test_client_server(redisdb):
 
         with pytest.raises(RemoteException):
             cli.call('get', unknown_arg='some-value')
+
+
+@pytest.mark.timeout(10)
+def test_expiry_times(redisdb):
+    cli = Client(redisdb, request_expire=10)
+
+    req_id = cli.call_async('zero')
+    assert 0 < redisdb.ttl(call_queue_name('redis_rpc', 'zero')) <= 10
+
+    resp_queue = response_queue_name('redis_rpc', 'zero', req_id)
+    with rpc_server(redisdb, {'zero': lambda: 0}, result_expire=10):
+        while redisdb.ttl(resp_queue) <= 0:
+            time.sleep(0.1)
+        assert 0 < redisdb.ttl(resp_queue) <= 10
