@@ -17,8 +17,8 @@ def rpc_get(k):
 
 def main():
     redis = StrictRedis.from_url("redis://localhost:6379/0")
-    rpc = Server(redis, 'rpc_example')
-    rpc.serve({'set': rpc_set, 'get': rpc_get})
+    srv = Server(redis, 'rpc_example')
+    srv.serve({'set': rpc_set, 'get': rpc_get})
 
 
 if __name__ == '__main__':

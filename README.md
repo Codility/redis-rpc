@@ -1,14 +1,21 @@
-Experiment: proof-of-concept minimal RPC-over-Redis
-===================================================
+Minimal RPC-over-Redis
+======================
 
 [![Build Status](https://travis-ci.org/marcinkaszynski/redis-rpc.svg?branch=master)](https://travis-ci.org/marcinkaszynski/redis-rpc)
 
-Goals:
+Why
+---
 
-- simple
-- potentially cross-language
-- focus on low latency rather than guaranteed execution
-- multiple clients, multiple workers
+Because using a queue system as backbone makes it easy to distribute
+work between multiple RPC servers, and makes it easy to replace them
+when necessary.
+
+
+Goals
+-----
+
+- simple: make it easy to port
+- low latency rather than guaranteed execution
 
 
 Planned use
@@ -16,35 +23,33 @@ Planned use
 
 server:
 
-    from redis_rpc import RedisRPC
+    import redis_rpc
 
     def func1(arg1, arg2):
         return arg1 + arg2
 
     redis = StrictRedis.from_url(...)
-    rpc = RedisRPC(redis, prefix)
-    rpc.serve({'func1': func1, 'func2': func2, ...})
+    srv = redis_rpc.Server(redis, prefix)
+    srv.serve({'func1': func1, 'func2': func2, ...})
 
 
 client:
 
-    from redis_rpc import RedisRPC
+    import redis_rpc
 
     redis = StrictRedis.from_url(...)
-    rpc = RedisRPC(redis, prefix)
-    print(rpc.call('func1', arg1=1, arg2=2))
+    cli = redis_rpc.Client(redis, prefix)
+    print(cli.call('func1', arg1=1, arg2=2))
 
 
 Protocol
 --------
 
-JSON.
+Use JSON to encode requests and responses.
 
-Expose functions as Redis queues, send back results via queues so that
-clients can BLPOP and receive them immediately.
-
-Every function is a separate Redis queue.  Shuffle queues in BLPOP to
-avoid starvation.
+A published function is available as a Redis queue.  Send results via
+single-use queues so that clients can BLPOP and receive them
+immediately.
 
 Queues:
 
@@ -58,9 +63,6 @@ Call message:
      "kw": {"arg1": "value1",
             "arg2": ["some", "list", "of", "values"]}
     }
-
-Call is sent to a queue specific to a particular function, so there is
-no need to additionally put function name in the message itself.
 
 Arguments and results may be any JSON-encodable values, including
 null/none.  This is not meant to be a framework that completely
@@ -77,16 +79,3 @@ Result message:
     # or, if finished with an exception
     {"ts": "{time-stamp-iso8601}",
      "exc": {exception-string}}
-
-
-Potential future
-----------------
-
-Multiple result values, with the API to receive them as soon as
-available (in Python: iterator that blocks waiting for next value or
-terminator).
-
-Bi-directional communication with the worker.
-
-Reject outdated calls.  Modify request format to make it cheap,
-without having to deserialize the whole object.
