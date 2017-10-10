@@ -96,8 +96,8 @@ class Client:
 
         (_, res_bytes) = popped
         res = json.loads(res_bytes)
-        if res.get('exc'):
-            raise RemoteException(res['exc'])
+        if res.get('err'):
+            raise RemoteException(res['err'])
         return res.get('res')
 
     def call(self, func_name, **kwargs):
@@ -151,7 +151,7 @@ class Server:
         except Exception as e:
             # TODO: format information about exception in a nicer way
             logging.exception('Caught exception while calling %s', func_name)
-            self.send_result(func_name, req['id'], exc=repr(e))
+            self.send_result(func_name, req['id'], err=repr(e))
 
     def send_result(self, func_name, req_id, **kwargs):
         msg = {'ts': datetime.now().isoformat()}

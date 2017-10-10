@@ -76,6 +76,6 @@ Result message:
     {"ts": "{time-stamp-iso8601}",
      "res": {result-value}}
 
-    # or, if finished with an exception
+    # or, if finished with an error
     {"ts": "{time-stamp-iso8601}",
-     "exc": {exception-string}}
+     "err": "{human-readable description of the error}"}
