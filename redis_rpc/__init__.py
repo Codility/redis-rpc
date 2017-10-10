@@ -1,11 +1,15 @@
 import json
 import logging
+import math
 import signal
+import time
 from datetime import datetime
 from uuid import uuid4
 
 
-BLPOP_TIMEOUT = 1  # seconds
+# All timeouts and expiry times are in seconds
+BLPOP_TIMEOUT = 1
+RESPONSE_TIMEOUT = 1
 REQUEST_EXPIRE = 120
 RESULT_EXPIRE = 120
 
@@ -54,12 +58,14 @@ class Scripts:
 class Client:
     def __init__(self, redis, prefix='redis_rpc',
                  request_expire=REQUEST_EXPIRE,
-                 blpop_timeout=BLPOP_TIMEOUT):
+                 blpop_timeout=BLPOP_TIMEOUT,
+                 response_timeout=RESPONSE_TIMEOUT):
         self._redis = redis
         self._prefix = prefix
         self._scripts = Scripts(redis)
         self._expire = request_expire
         self._blpop_timeout = blpop_timeout
+        self._response_timeout = response_timeout
         warn_if_no_socket_timeout(redis)
 
     def call_async(self, func_name, **kwargs):
@@ -74,11 +80,19 @@ class Client:
         return req_id
 
     def response(self, func_name, req_id):
-        # TODO: wait longer than BLPOP_TIMEOUT
+        start_ts = time.time()
+        deadline_ts = start_ts + self._response_timeout
+
         qn = response_queue_name(self._prefix, func_name, req_id)
-        popped = self._redis.blpop([qn], self._blpop_timeout)
-        if popped is None:
-            raise RPCTimeout()
+
+        popped = None
+        while popped is None:
+            now_ts = time.time()
+            if now_ts >= deadline_ts:
+                raise RPCTimeout()
+
+            wait_time = math.ceil(min(self._blpop_timeout, deadline_ts - now_ts))
+            popped = self._redis.blpop([qn], wait_time)
 
         (_, res_bytes) = popped
         res = json.loads(res_bytes)

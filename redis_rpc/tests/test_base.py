@@ -96,3 +96,14 @@ def test_server_rotates_queues():
     assert last_call_queues() == [b'redis_rpc:a:calls',
                                   b'redis_rpc:b:calls',
                                   b'redis_rpc:c:calls']
+
+
+def test_client_timeout():
+    mockredis = Mock()
+
+    mockredis.blpop.return_value = None
+
+    cli = Client(mockredis, response_timeout=1)
+    with pytest.raises(RPCTimeout):
+        cli.call('fake_func')
+    assert mockredis.blpop.call_count > 1
