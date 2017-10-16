@@ -1,7 +1,7 @@
 Minimal RPC-over-Redis
 ======================
 
-[![Build Status](https://travis-ci.org/marcinkaszynski/redis-rpc.svg?branch=master)](https://travis-ci.org/marcinkaszynski/redis-rpc)
+[![Build Status](https://travis-ci.org/Codility/redis-rpc.svg?branch=master)](https://travis-ci.org/Codility/redis-rpc)
 
 Why
 ---
