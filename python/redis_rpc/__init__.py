@@ -118,7 +118,7 @@ class Server:
         self._func_map = func_map
         self._queue_map = {call_queue_name(self._prefix, name): (name, func)
                            for (name, func) in func_map.items()}
-        self._queue_names = list(self._queue_map.keys())
+        self._queue_names = sorted((self._queue_map.keys()))
         self._call_idx = 0
         warn_if_no_socket_timeout(redis)
 
