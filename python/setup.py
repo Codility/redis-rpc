@@ -11,5 +11,6 @@ setup(
     url='https://github.com/marcinkaszynski/redis-rpc',
     setup_requires=['pytest-runner'],
     install_requires=['redis'],
-    tests_require=['pytest', 'pytest-redis', 'pytest-timeout']
+    tests_require=['pytest', 'pytest-redis', 'pytest-timeout'],
+    python_requires=">=3.5"
 )

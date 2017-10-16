@@ -75,7 +75,7 @@ class Client:
         msg['kw'] = kwargs
 
         self._scripts.rpush_ex(call_queue_name(self._prefix, func_name),
-                               json.dumps(msg), self._expire)
+                               json.dumps(msg).encode(), self._expire)
 
         return req_id
 
@@ -95,7 +95,7 @@ class Client:
             popped = self._redis.blpop([qn], wait_time)
 
         (_, res_bytes) = popped
-        res = json.loads(res_bytes)
+        res = json.loads(res_bytes.decode())
         if res.get('err'):
             raise RemoteException(res['err'])
         return res.get('res')
@@ -118,7 +118,7 @@ class Server:
         self._func_map = func_map
         self._queue_map = {call_queue_name(self._prefix, name): (name, func)
                            for (name, func) in func_map.items()}
-        self._queue_names = list(self._queue_map.keys())
+        self._queue_names = sorted((self._queue_map.keys()))
         self._call_idx = 0
         warn_if_no_socket_timeout(redis)
 
@@ -140,7 +140,7 @@ class Server:
         (queue, req_str) = popped
         (func_name, func) = self._queue_map[queue]
         try:
-            req = json.loads(req_str)
+            req = json.loads(req_str.decode())
         except Exception as e:
             logging.exception('Could not parse incoming message: %s', req_str)
             return
@@ -158,7 +158,7 @@ class Server:
         msg.update(kwargs)
         self._scripts.rpush_ex(response_queue_name(self._prefix, func_name,
                                                    req_id),
-                               json.dumps(msg), self._expire)
+                               json.dumps(msg).encode(), self._expire)
 
     def termination_signal(self, signum, frame):
         logging.info('Received %s, will quit.', signal.Signals(signum).name)
