@@ -7,6 +7,9 @@ from datetime import datetime
 from uuid import uuid4
 
 
+log = logging.getLogger('redis-rpc')
+
+
 # All timeouts and expiry times are in seconds
 BLPOP_TIMEOUT = 1
 RESPONSE_TIMEOUT = 1
@@ -37,9 +40,27 @@ def rotated(l, places):
 
 def warn_if_no_socket_timeout(redis):
     if redis.connection_pool.connection_kwargs.get('socket_timeout') is None:
-        logging.warning('RPC: Redis instance does not set socket_timeout.  '
-                        'This means potential trouble in case of network '
-                        'problems between Redis and RPC client or server.')
+        log.warning('RPC: Redis instance does not set socket_timeout.  '
+                    'This means potential trouble in case of network '
+                    'problems between Redis and RPC client or server.')
+
+
+def escape_for_logs(v):
+    # quick and dirty way to avoid log forging/injection
+    return json.dumps(v)
+
+
+def log_request(func_name, req_bytes, exception, msg):
+    if exception:
+        log.exception('%s %s %s %s',
+                      func_name,
+                      escape_for_logs(req_bytes.decode()),
+                      escape_for_logs('%s: %s' % (type(exception).__name__, str(exception))),
+                      msg)
+    else:
+        log.info('%s %s - %s', func_name,
+                 escape_for_logs(req_bytes.decode()),
+                 msg)
 
 
 class Scripts:
@@ -122,6 +143,10 @@ class Server:
         self._call_idx = 0
         warn_if_no_socket_timeout(redis)
 
+    @property
+    def queue_names(self):
+        return list(self._queue_names)
+
     def serve(self):
         self._quit = False
         signal.signal(signal.SIGTERM, self.termination_signal)
@@ -137,12 +162,13 @@ class Server:
         if popped is None:
             return
 
-        (queue, req_str) = popped
+        (queue, req_bytes) = popped
         (func_name, func) = self._queue_map[queue]
         try:
-            req = json.loads(req_str.decode())
+            req = json.loads(req_bytes.decode())
         except Exception as e:
-            logging.exception('Could not parse incoming message: %s', req_str)
+            log_request(func_name, req_bytes, e,
+                        'Could not parse incoming message')
             return
 
         try:
@@ -150,8 +176,12 @@ class Server:
             self.send_result(func_name, req['id'], res=res)
         except Exception as e:
             # TODO: format information about exception in a nicer way
-            logging.exception('Caught exception while calling %s', func_name)
+            log_request(func_name, req_bytes, e,
+                        'Caught exception while calling %s' % func_name)
             self.send_result(func_name, req['id'], err=repr(e))
+        else:
+            log_request(func_name, req_bytes, None, 'OK')
+            
 
     def send_result(self, func_name, req_id, **kwargs):
         msg = {'ts': datetime.now().isoformat()}
@@ -161,5 +191,5 @@ class Server:
                                json.dumps(msg).encode(), self._expire)
 
     def termination_signal(self, signum, frame):
-        logging.info('Received %s, will quit.', signal.Signals(signum).name)
+        log.info('Received %s, will quit.', signal.Signals(signum).name)
         self._quit = True

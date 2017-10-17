@@ -1,5 +1,6 @@
 #!env python3
 
+import logging
 from redis import StrictRedis
 from redis_rpc import Server
 
@@ -15,9 +16,15 @@ def rpc_get(k):
     return VALUES[k]
 
 
+REDIS_URI = "redis://localhost:6379/0"
+
+
 def main():
-    redis = StrictRedis.from_url("redis://localhost:6379/0", socket_timeout=10)
+    logging.basicConfig(level='INFO')
+
+    redis = StrictRedis.from_url(REDIS_URI, socket_timeout=10)
     srv = Server(redis, {'set': rpc_set, 'get': rpc_get}, 'rpc_example')
+    print("Listening on", REDIS_URI, "queues:", srv.queue_names)
     srv.serve()
 
 
