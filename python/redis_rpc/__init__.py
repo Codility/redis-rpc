@@ -141,6 +141,7 @@ class Server:
                            for (name, func) in func_map.items()}
         self._queue_names = sorted((self._queue_map.keys()))
         self._call_idx = 0
+        self._quit = False
         warn_if_no_socket_timeout(redis)
 
     @property
@@ -148,12 +149,11 @@ class Server:
         return list(self._queue_names)
 
     def serve(self):
-        self._quit = False
-        signal.signal(signal.SIGTERM, self.termination_signal)
-        signal.signal(signal.SIGINT, self.termination_signal)
-
         while not self._quit:
             self.serve_one()
+
+    def quit(self):
+        self._quit = True
 
     def serve_one(self):
         popped = self._redis.blpop(rotated(self._queue_names, self._call_idx),
@@ -181,7 +181,6 @@ class Server:
             self.send_result(func_name, req['id'], err=repr(e))
         else:
             log_request(func_name, req_bytes, None, 'OK')
-            
 
     def send_result(self, func_name, req_id, **kwargs):
         msg = {'ts': datetime.now().isoformat()}
@@ -190,6 +189,10 @@ class Server:
                                                    req_id),
                                json.dumps(msg).encode(), self._expire)
 
+    def quit_on_signals(self, signals=[signal.SIGTERM, signal.SIGINT]):
+        for s in signals:
+            signal.signal(s, self.termination_signal)
+
     def termination_signal(self, signum, frame):
         log.info('Received %s, will quit.', signal.Signals(signum).name)
-        self._quit = True
+        self.quit()
