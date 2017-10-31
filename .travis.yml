@@ -3,4 +3,6 @@ python:
   - 3.5
   - 3.6
 script:
-  - cd python && python setup.py test
+  - cd python 
+  - python setup.py test
+  - pip install yapf && yapf --diff **/*.py
