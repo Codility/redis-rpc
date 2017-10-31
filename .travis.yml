@@ -5,4 +5,3 @@ python:
 script:
   - cd python 
   - python setup.py test
-  - pip install yapf && yapf --diff **/*.py
