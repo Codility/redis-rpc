@@ -1,6 +1,5 @@
 from setuptools import setup
 
-
 setup(
     name='redis-rpc',
     packages=['redis_rpc'],
@@ -12,5 +11,4 @@ setup(
     setup_requires=['pytest-runner'],
     install_requires=['redis'],
     tests_require=['pytest', 'pytest-redis', 'pytest-timeout'],
-    python_requires=">=3.5"
-)
+    python_requires=">=3.5")
