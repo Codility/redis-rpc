@@ -2,6 +2,7 @@ package redrpc
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
@@ -74,7 +75,7 @@ func (s *Server) Run() {
 	for {
 		res, err := s.red.BLPop(time.Second, s.queues...).Result()
 		if err == redis.Nil {
-			// queue doesn't exist
+			// nothing showed up
 			continue
 		}
 		if err != nil {
@@ -104,7 +105,36 @@ func (s *Server) handleBLPopResult(res []string) error {
 }
 
 func (s *Server) callHandler(func_name string, req *RequestImpl, handler Handler) error {
-	// TODO: recover
+	defer func() {
+		recovered := recover()
+		if recovered != nil {
+			log.Print("ERR:", recovered)
+			switch v := recovered.(type) {
+			case error:
+				log.Print("ERR:", v)
+				s.sendResponse(func_name, req, ErrResponse{
+					Ts:  "TODO",
+					Err: v.Error(),
+				})
+			case fmt.Stringer:
+				s.sendResponse(func_name, req, ErrResponse{
+					Ts:  "TODO",
+					Err: v.String(),
+				})
+			case string:
+				s.sendResponse(func_name, req, ErrResponse{
+					Ts:  "TODO",
+					Err: v,
+				})
+			default:
+				s.sendResponse(func_name, req, ErrResponse{
+					Ts:  "TODO",
+					Err: "other error",
+				})
+			}
+		}
+	}()
+
 	res, err := handler.ServeRPC(req)
 	if err != nil {
 		s.sendResponse(func_name, req, ErrResponse{
