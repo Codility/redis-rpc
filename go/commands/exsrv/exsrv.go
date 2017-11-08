@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/go-redis/redis"
 	"github.com/marcinkaszynski/redis_rpc/go/redrpc"
 )
@@ -16,13 +18,16 @@ func set(req redrpc.Request) (interface{}, error) {
 	return nil, nil
 }
 
+const REDIS_URI = "localhost:6379"
+
 func main() {
 	red := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
+		Addr: REDIS_URI,
 	})
 	srv := redrpc.NewServer(red, map[string]redrpc.Handler{
 		"get": redrpc.HandlerFunc(get),
 		"set": redrpc.HandlerFunc(set),
 	})
+	fmt.Println("Starting srv")
 	srv.Run()
 }
