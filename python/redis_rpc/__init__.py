@@ -63,17 +63,13 @@ def log_request(func_name, req_bytes, exception, msg):
                  msg)
 
 
-class Scripts:
-
-    RPUSH_EX = ("redis.call('rpush', KEYS[1], ARGV[1]);"
-                "redis.call('expire', KEYS[1], ARGV[2])")
-
-    def __init__(self, redis):
-        self.redis = redis
-        self._rpush_ex = redis.register_script(self.RPUSH_EX)
-
-    def rpush_ex(self, queue, msg, expire):
-        self._rpush_ex(keys=[queue], args=[msg, expire])
+# Atomic RPUSH + EXPIRE.
+# (The pipeline is executed as MULTI by redis-py).
+def rpush_ex(redis, key, value, ttl):
+    pipe = redis.pipeline()
+    pipe.rpush(key, value)
+    pipe.expire(key, ttl)
+    pipe.execute()
 
 
 class Client:
@@ -83,7 +79,6 @@ class Client:
                  response_timeout=RESPONSE_TIMEOUT):
         self._redis = redis
         self._prefix = prefix
-        self._scripts = Scripts(redis)
         self._expire = request_expire
         self._blpop_timeout = blpop_timeout
         self._response_timeout = response_timeout
@@ -95,8 +90,10 @@ class Client:
                'ts': datetime.now().isoformat()}
         msg['kw'] = kwargs
 
-        self._scripts.rpush_ex(call_queue_name(self._prefix, func_name),
-                               json.dumps(msg).encode(), self._expire)
+        rpush_ex(self._redis,
+                 call_queue_name(self._prefix, func_name),
+                 json.dumps(msg).encode(),
+                 self._expire)
 
         return req_id
 
@@ -133,7 +130,6 @@ class Server:
                  blpop_timeout=BLPOP_TIMEOUT):
         self._redis = redis
         self._prefix = prefix
-        self._scripts = Scripts(redis)
         self._expire = result_expire
         self._blpop_timeout = blpop_timeout
         self._func_map = func_map
@@ -185,9 +181,10 @@ class Server:
     def send_result(self, func_name, req_id, **kwargs):
         msg = {'ts': datetime.now().isoformat()}
         msg.update(kwargs)
-        self._scripts.rpush_ex(response_queue_name(self._prefix, func_name,
-                                                   req_id),
-                               json.dumps(msg).encode(), self._expire)
+        rpush_ex(self._redis,
+                 response_queue_name(self._prefix, func_name,
+                                     req_id),
+                 json.dumps(msg).encode(), self._expire)
 
     def quit_on_signals(self, signals=[signal.SIGTERM, signal.SIGINT]):
         for s in signals:
