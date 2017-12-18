@@ -142,7 +142,8 @@ class Client:
 
     def updates(self, func_name, req_id):
         qn = updates_queue_name(self._prefix, func_name, req_id)
-        return self._redis.lrange(qn, 0, -1)
+        msgs = [json.loads(b.decode()) for b in self._redis.lrange(qn, 0, -1)]
+        return [b.get('up') for b in msgs]
 
     def call(self, func_name, **kwargs):
         req_id = self.call_async(func_name, **kwargs)
