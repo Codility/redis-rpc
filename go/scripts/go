@@ -2,5 +2,4 @@
 set -e
 
 . "$(git rev-parse --show-toplevel)/go/scripts/goenv.sh"
-echo GOPATH $GOPATH
 exec go "${@}"

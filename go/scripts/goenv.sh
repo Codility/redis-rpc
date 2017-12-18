@@ -8,5 +8,3 @@ gopkg_path="${GOPATH}/src/${gopkg}"
 gopkg_root="${gopkg_path%/*/*}"
 mkdir -p "${gopkg_root}"
 ln -sf "${gocode_root}" "${gopkg_root}"
-
-cd "${GOPATH}"
