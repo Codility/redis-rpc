@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+
+. "$(git rev-parse --show-toplevel)/go/scripts/goenv.sh"
+
+if ! [ -x "${GOBIN}/gvt" -a -z "${UPGRADE_GVT}" ] ; then
+    go get -u github.com/FiloSottile/gvt
+fi
+
+cd src/github.com/Codility/redis-rpc/go
+exec ${GOBIN}/gvt "${@}"

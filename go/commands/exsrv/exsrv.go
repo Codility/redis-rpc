@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
+	"github.com/Codility/redis-rpc/go/redrpc"
 	"github.com/go-redis/redis"
-	"github.com/marcinkaszynski/redis_rpc/go/redrpc"
 )
 
 var data = map[string]interface{}{}
