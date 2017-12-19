@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-redis/redis"
@@ -24,20 +25,14 @@ type Request interface {
 	GetString(name string) string
 }
 
-func callQueueName(prefix, func_name string) string {
-	return prefix + ":" + func_name + ":calls"
-}
-
-func responseQueueName(prefix, func_name, req_id string) string {
-	return prefix + ":" + func_name + ":result:" + req_id
-}
-
 type Server struct {
 	red      *redis.Client
 	handlers map[string]Handler
 	prefix   string
 	queues   []string
 	queueMap map[string]string
+
+	closing int64
 }
 
 type RequestImpl struct {
@@ -72,7 +67,7 @@ func NewServer(red *redis.Client, handlers map[string]Handler) *Server {
 }
 
 func (s *Server) Run() {
-	for {
+	for !s.isClosing() {
 		res, err := s.red.BLPop(time.Second, s.queues...).Result()
 		if err == redis.Nil {
 			// nothing showed up
@@ -86,6 +81,14 @@ func (s *Server) Run() {
 			s.handleBLPopResult(res)
 		}
 	}
+}
+
+func (s *Server) Close() {
+	atomic.AddInt64(&s.closing, 1)
+}
+
+func (s *Server) isClosing() bool {
+	return atomic.LoadInt64(&s.closing) > 0
 }
 
 func (s *Server) handleBLPopResult(res []string) error {
