@@ -1,5 +1,7 @@
 package redrpc
 
+// TODO: start Redis once for the entire run instead of per-test
+
 import (
 	"fmt"
 	"log"
@@ -112,6 +114,32 @@ func TestExpiryTimes(t *testing.T) {
 
 		break
 	}
+}
+
+func TestErrorPropagation(t *testing.T) {
+	redCmd := mustStartRedisServer(BaseTestRedisPort)
+	defer redCmd.Process.Kill()
+
+	red := redis.NewClient(&redis.Options{Addr: testRedisAddr()})
+
+	srv := NewServer(red, nil, map[string]Handler{
+		"error": HandlerFunc(func(req Request) (interface{}, error) { return nil, fmt.Errorf("returned error") }),
+		"panic": HandlerFunc(func(req Request) (interface{}, error) { panic("panicked") }),
+	})
+	go srv.Run()
+	defer srv.Close()
+
+	cli := NewClient(red, &Options{RequestExpire: 10 * time.Second})
+
+	resp, err := cli.Call("error", map[string]interface{}{})
+	assert.Nil(t, resp)
+	assert.True(t, IsRemoteException(err))
+	assert.Equal(t, err.Error(), "returned error")
+
+	resp, err = cli.Call("panic", map[string]interface{}{})
+	assert.Nil(t, resp)
+	assert.True(t, IsRemoteException(err))
+	assert.Equal(t, err.Error(), "panicked")
 }
 
 func mustStartRedisServer(port int, args ...string) *exec.Cmd {
