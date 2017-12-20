@@ -27,8 +27,8 @@ type Request interface {
 
 type Server struct {
 	red      *redis.Client
+	opts     *Options
 	handlers map[string]Handler
-	prefix   string
 	queues   []string
 	queueMap map[string]string
 
@@ -46,20 +46,30 @@ func (r RequestImpl) GetValue(k string) interface{} {
 }
 
 func (r RequestImpl) GetString(k string) string {
-	return r.GetValue(k).(string)
+	v := r.GetValue(k)
+	if v == nil {
+		return ""
+	}
+
+	str, ok := v.(string)
+	if ok {
+		return str
+	}
+
+	// Convert to string as widely accepting as you can.
+	return fmt.Sprint(v)
 }
 
-// TODO: ServerOptions: prefix, timeouts, etc
-func NewServer(red *redis.Client, handlers map[string]Handler) *Server {
+func NewServer(red *redis.Client, opts *Options, handlers map[string]Handler) *Server {
 	srv := &Server{
 		red:      red,
 		handlers: handlers,
-		prefix:   "redis_rpc",
+		opts:     OptsWithDefaults(opts),
 		queues:   []string{},
 		queueMap: map[string]string{},
 	}
 	for func_name, _ := range handlers {
-		qname := callQueueName(srv.prefix, func_name)
+		qname := callQueueName(srv.opts.Prefix, func_name)
 		srv.queues = append(srv.queues, qname)
 		srv.queueMap[qname] = func_name
 	}
@@ -85,6 +95,7 @@ func (s *Server) Run() {
 
 func (s *Server) Close() {
 	atomic.AddInt64(&s.closing, 1)
+	// TODO: wait for it to actually close
 }
 
 func (s *Server) isClosing() bool {
@@ -165,17 +176,14 @@ type ResResponse struct {
 }
 
 func (s *Server) sendResponse(func_name string, req *RequestImpl, res interface{}) error {
-	// TODO: expire
-
 	msg, err := json.Marshal(res)
 	if err != nil {
 		log.Println("Error while marshaling reply: ", res)
 		return err
 	}
 
-	qn := responseQueueName(s.prefix, func_name, req.Id)
-
-	if _, err = s.red.RPush(qn, msg).Result(); err != nil {
+	qn := responseQueueName(s.opts.Prefix, func_name, req.Id)
+	if err = rpushEx(s.red, qn, string(msg), s.opts.ResultExpire); err != nil {
 		log.Println("Error while sending reply: ", err)
 		return err
 	}

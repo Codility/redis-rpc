@@ -7,14 +7,6 @@ import (
 	"github.com/go-redis/redis"
 )
 
-const (
-	BLPOPTimeout    = 1 * time.Second
-	ResponseTimeout = 1 * time.Second
-
-	RequestExpire = 120 * time.Second
-	ResultExpire  = 120 * time.Second
-)
-
 func callQueueName(prefix, funcName string) string {
 	return fmt.Sprintf("%s:%s:calls", prefix, funcName)
 }

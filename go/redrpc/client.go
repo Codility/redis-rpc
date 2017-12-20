@@ -11,22 +11,16 @@ import (
 )
 
 type Client struct {
-	red    *redis.Client
-	prefix string
-
-	requestExpire, resultExpire, responseTimeout time.Duration
+	red  *redis.Client
+	opts *Options
 }
 
-// TODO: ClientOptions: prefix, timeouts, etc
-func NewClient(red *redis.Client) *Client {
-	return &Client{
-		red:    red,
-		prefix: "redis_rpc",
-
-		requestExpire:   RequestExpire,
-		resultExpire:    ResultExpire,
-		responseTimeout: ResponseTimeout,
+func NewClient(red *redis.Client, opts *Options) *Client {
+	cli := &Client{
+		red:  red,
+		opts: OptsWithDefaults(opts),
 	}
+	return cli
 }
 
 func (c *Client) CallAsync(funcName string, kwargs map[string]interface{}) (string, error) {
@@ -42,7 +36,7 @@ func (c *Client) CallAsync(funcName string, kwargs map[string]interface{}) (stri
 		return "", err
 	}
 
-	err = rpushEx(c.red, callQueueName(c.prefix, funcName), string(msgBytes), c.requestExpire)
+	err = rpushEx(c.red, callQueueName(c.opts.Prefix, funcName), string(msgBytes), c.opts.RequestExpire)
 	if err != nil {
 		return "", err
 	}
@@ -60,8 +54,8 @@ func (c *Client) Call(funcName string, kwargs map[string]interface{}) (interface
 
 func (c *Client) Response(funcName, reqId string) (interface{}, error) {
 	startTs := time.Now()
-	deadlineTs := startTs.Add(c.responseTimeout)
-	queueName := responseQueueName(c.prefix, funcName, reqId)
+	deadlineTs := startTs.Add(c.opts.ResponseTimeout)
+	queueName := responseQueueName(c.opts.Prefix, funcName, reqId)
 
 	for {
 		nowTs := time.Now()
@@ -70,8 +64,8 @@ func (c *Client) Response(funcName, reqId string) (interface{}, error) {
 		}
 
 		waitTime := deadlineTs.Sub(nowTs)
-		if BLPOPTimeout < waitTime {
-			waitTime = BLPOPTimeout
+		if c.opts.BLPOPTimeout < waitTime {
+			waitTime = c.opts.BLPOPTimeout
 		}
 		if waitTime < time.Second {
 			waitTime = time.Second

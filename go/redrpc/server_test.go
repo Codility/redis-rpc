@@ -24,7 +24,7 @@ func TestBaseUsage(t *testing.T) {
 	defer redCmd.Process.Kill()
 
 	red := redis.NewClient(&redis.Options{Addr: testRedisAddr()})
-	cli := NewClient(red)
+	cli := NewClient(red, &Options{RequestExpire: 10 * time.Second})
 
 	_, err := cli.Call("get", map[string]interface{}{
 		"k": "k0",
@@ -36,7 +36,7 @@ func TestBaseUsage(t *testing.T) {
 
 	data := map[string]interface{}{}
 
-	srv := NewServer(red, map[string]Handler{
+	srv := NewServer(red, &Options{}, map[string]Handler{
 		"get": HandlerFunc(func(req Request) (interface{}, error) {
 			// raise error on non-existant keys to verify
 			// propagation
@@ -69,6 +69,49 @@ func TestBaseUsage(t *testing.T) {
 	res, err = cli.Call("get", map[string]interface{}{"unknown_arg": "some-value"})
 	assert.Nil(t, res)
 	assert.True(t, IsRemoteException(err))
+}
+
+func TestExpiryTimes(t *testing.T) {
+	redCmd := mustStartRedisServer(BaseTestRedisPort)
+	defer redCmd.Process.Kill()
+
+	red := redis.NewClient(&redis.Options{Addr: testRedisAddr()})
+	cli := NewClient(red, &Options{RequestExpire: 10 * time.Second})
+
+	reqId, err := cli.CallAsync("zero", map[string]interface{}{})
+	assert.Nil(t, err)
+
+	ttl, err := red.TTL(callQueueName(cli.opts.Prefix, "zero")).Result()
+	assert.Nil(t, err)
+
+	if ttl <= 0 || ttl > 10*time.Second {
+		t.Fatal("Request TTL outside expected range: ", ttl)
+	}
+
+	srv := NewServer(red, &Options{ResultExpire: 10 * time.Second}, map[string]Handler{
+		"zero": HandlerFunc(func(req Request) (interface{}, error) {
+			return 0, nil
+		}),
+	})
+	go srv.Run()
+	defer srv.Close()
+
+	respQueue := responseQueueName(cli.opts.Prefix, "zero", reqId)
+	for {
+		ttl, err = red.TTL(respQueue).Result()
+		assert.Nil(t, err)
+		if ttl <= 0 {
+			// The server did not send a response yet
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+
+		if ttl > 10*time.Second {
+			t.Fatal("Response TTL outside expected range: ", ttl)
+		}
+
+		break
+	}
 }
 
 func mustStartRedisServer(port int, args ...string) *exec.Cmd {
