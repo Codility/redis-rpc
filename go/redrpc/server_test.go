@@ -10,21 +10,21 @@ import (
 )
 
 type TestDbAdapter struct {
-	blpop   func(timeout time.Duration, keys ...string) ([]string, error)
-	rpushex func(key, value string, ttl time.Duration) error
+	blpopMock   func(timeout time.Duration, keys ...string) ([]string, error)
+	rpushexMock func(key, value string, ttl time.Duration) error
 }
 
 func (a *TestDbAdapter) BLPop(timeout time.Duration, keys ...string) ([]string, error) {
-	return a.blpop(timeout, keys...)
+	return a.blpopMock(timeout, keys...)
 }
 
 func (a *TestDbAdapter) RPushEx(key, value string, ttl time.Duration) error {
-	return a.rpushex(key, value, ttl)
+	return a.rpushexMock(key, value, ttl)
 }
 
 func TestNoCalls(t *testing.T) {
 	red := &TestDbAdapter{
-		blpop: func(timeout time.Duration, keys ...string) ([]string, error) {
+		blpopMock: func(timeout time.Duration, keys ...string) ([]string, error) {
 			return []string{}, redis.Nil
 		},
 	}
@@ -34,7 +34,7 @@ func TestNoCalls(t *testing.T) {
 
 func TestErrorOnBLPop(t *testing.T) {
 	red := &TestDbAdapter{
-		blpop: func(timeout time.Duration, keys ...string) ([]string, error) {
+		blpopMock: func(timeout time.Duration, keys ...string) ([]string, error) {
 			return []string{}, fmt.Errorf("Error in blpop")
 		},
 	}
@@ -47,13 +47,13 @@ func TestCorrectCall(t *testing.T) {
 	var resultTTL time.Duration
 
 	red := &TestDbAdapter{
-		blpop: func(timeout time.Duration, keys ...string) ([]string, error) {
+		blpopMock: func(timeout time.Duration, keys ...string) ([]string, error) {
 			return []string{
 				"redis_rpc:test:calls",
 				`{"id":"call-id", "ts":"2017-01-01T00:00:00Z", "kw":{"i": 123, "s": "str123"}}`,
 			}, nil
 		},
-		rpushex: func(key, value string, ttl time.Duration) error {
+		rpushexMock: func(key, value string, ttl time.Duration) error {
 			result = []string{key, value}
 			resultTTL = ttl
 			return nil
@@ -80,10 +80,10 @@ func TestPropagateError(t *testing.T) {
 	var resultTTL time.Duration
 
 	red := &TestDbAdapter{
-		blpop: func(timeout time.Duration, keys ...string) ([]string, error) {
+		blpopMock: func(timeout time.Duration, keys ...string) ([]string, error) {
 			return []string{"redis_rpc:test:calls", `{"id":"call-id", "ts":"2017-01-01T00:00:00Z", "kw":{}}`}, nil
 		},
-		rpushex: func(key, value string, ttl time.Duration) error {
+		rpushexMock: func(key, value string, ttl time.Duration) error {
 			result = []string{key, value}
 			resultTTL = ttl
 			return nil
@@ -108,10 +108,10 @@ func TestPropagatePanic(t *testing.T) {
 	var resultTTL time.Duration
 
 	red := &TestDbAdapter{
-		blpop: func(timeout time.Duration, keys ...string) ([]string, error) {
+		blpopMock: func(timeout time.Duration, keys ...string) ([]string, error) {
 			return []string{"redis_rpc:test:calls", `{"id":"call-id", "ts":"2017-01-01T00:00:00Z", "kw":{}}`}, nil
 		},
-		rpushex: func(key, value string, ttl time.Duration) error {
+		rpushexMock: func(key, value string, ttl time.Duration) error {
 			result = []string{key, value}
 			resultTTL = ttl
 			return nil
