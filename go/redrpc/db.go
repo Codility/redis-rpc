@@ -6,10 +6,16 @@ import (
 	"github.com/go-redis/redis"
 )
 
+//////////////////////////////////////////////////
+// DbAdapter
+
 type DbAdapter interface {
 	BLPop(timeout time.Duration, keys ...string) ([]string, error)
 	RPushEx(key, value string, ttl time.Duration) error
 }
+
+//////////////////////////////////////////////////
+// RedisAdapter
 
 type RedisAdapter struct {
 	red *redis.Client

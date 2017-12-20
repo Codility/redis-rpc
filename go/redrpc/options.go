@@ -15,6 +15,7 @@ const (
 type Options struct {
 	Prefix                                                     string
 	RequestExpire, ResultExpire, ResponseTimeout, BLPOPTimeout time.Duration
+	TimeSource                                                 func() time.Time
 }
 
 func OptsWithDefaults(o *Options) *Options {
@@ -37,6 +38,9 @@ func OptsWithDefaults(o *Options) *Options {
 	}
 	if ret.BLPOPTimeout == 0 {
 		ret.BLPOPTimeout = DefaultBLPOPTimeout
+	}
+	if ret.TimeSource == nil {
+		ret.TimeSource = time.Now
 	}
 	return &ret
 }

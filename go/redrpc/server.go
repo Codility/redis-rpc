@@ -91,19 +91,22 @@ func NewServerWithAdapter(red DbAdapter, opts *Options, handlers map[string]Hand
 
 func (s *Server) Run() {
 	for !s.isClosing() {
-		res, err := s.red.BLPop(time.Second, s.queues...)
-		if err == redis.Nil {
-			// nothing showed up
-			continue
-		}
-		if err != nil {
-			log.Print("Error in BLPOP: ", err)
+		if !s.RunOnce() {
 			return
 		}
-		if len(res) > 1 {
-			s.handleBLPopResult(res)
-		}
 	}
+}
+
+func (s *Server) RunOnce() bool {
+	res, err := s.red.BLPop(time.Second, s.queues...)
+	if err != nil && err != redis.Nil {
+		log.Print("Error in BLPOP: ", err)
+		return false
+	}
+	if len(res) > 1 {
+		s.handleBLPopResult(res)
+	}
+	return true
 }
 
 func (s *Server) Close() {
@@ -140,22 +143,22 @@ func (s *Server) callHandler(func_name string, req *RequestImpl, handler Handler
 			case error:
 				log.Print("ERR:", v)
 				s.sendResponse(func_name, req, ErrResponse{
-					Ts:  timestamp(),
+					Ts:  s.timestamp(),
 					Err: v.Error(),
 				})
 			case fmt.Stringer:
 				s.sendResponse(func_name, req, ErrResponse{
-					Ts:  timestamp(),
+					Ts:  s.timestamp(),
 					Err: v.String(),
 				})
 			case string:
 				s.sendResponse(func_name, req, ErrResponse{
-					Ts:  timestamp(),
+					Ts:  s.timestamp(),
 					Err: v,
 				})
 			default:
 				s.sendResponse(func_name, req, ErrResponse{
-					Ts:  timestamp(),
+					Ts:  s.timestamp(),
 					Err: "other error",
 				})
 			}
@@ -165,12 +168,12 @@ func (s *Server) callHandler(func_name string, req *RequestImpl, handler Handler
 	res, err := handler.ServeRPC(req)
 	if err != nil {
 		s.sendResponse(func_name, req, ErrResponse{
-			Ts:  timestamp(),
+			Ts:  s.timestamp(),
 			Err: err.Error(),
 		})
 	} else {
 		s.sendResponse(func_name, req, ResResponse{
-			Ts:  timestamp(),
+			Ts:  s.timestamp(),
 			Res: res,
 		})
 	}
@@ -202,4 +205,8 @@ func (s *Server) sendResponse(func_name string, req *RequestImpl, res interface{
 	}
 
 	return nil
+}
+
+func (s *Server) timestamp() string {
+	return s.opts.TimeSource().Format(time.RFC3339)
 }
