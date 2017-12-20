@@ -24,7 +24,7 @@ func main() {
 	red := redis.NewClient(&redis.Options{
 		Addr: REDIS_URI,
 	})
-	srv := redrpc.NewServer(red, map[string]redrpc.Handler{
+	srv := redrpc.NewServer(red, nil, map[string]redrpc.Handler{
 		"get": redrpc.HandlerFunc(get),
 		"set": redrpc.HandlerFunc(set),
 	})
