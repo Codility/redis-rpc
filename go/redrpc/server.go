@@ -127,22 +127,22 @@ func (s *Server) callHandler(func_name string, req *RequestImpl, handler Handler
 			case error:
 				log.Print("ERR:", v)
 				s.sendResponse(func_name, req, ErrResponse{
-					Ts:  "TODO",
+					Ts:  timestamp(),
 					Err: v.Error(),
 				})
 			case fmt.Stringer:
 				s.sendResponse(func_name, req, ErrResponse{
-					Ts:  "TODO",
+					Ts:  timestamp(),
 					Err: v.String(),
 				})
 			case string:
 				s.sendResponse(func_name, req, ErrResponse{
-					Ts:  "TODO",
+					Ts:  timestamp(),
 					Err: v,
 				})
 			default:
 				s.sendResponse(func_name, req, ErrResponse{
-					Ts:  "TODO",
+					Ts:  timestamp(),
 					Err: "other error",
 				})
 			}
@@ -152,12 +152,12 @@ func (s *Server) callHandler(func_name string, req *RequestImpl, handler Handler
 	res, err := handler.ServeRPC(req)
 	if err != nil {
 		s.sendResponse(func_name, req, ErrResponse{
-			Ts:  "TODO",
+			Ts:  timestamp(),
 			Err: err.Error(),
 		})
 	} else {
 		s.sendResponse(func_name, req, ResResponse{
-			Ts:  "TODO",
+			Ts:  timestamp(),
 			Res: res,
 		})
 	}
