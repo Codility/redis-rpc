@@ -10,6 +10,9 @@ import (
 	"github.com/go-redis/redis"
 )
 
+//////////////////////////////////////////////////
+// Handler
+
 type Handler interface {
 	ServeRPC(Request) (interface{}, error)
 }
@@ -20,13 +23,19 @@ func (h HandlerFunc) ServeRPC(r Request) (interface{}, error) {
 	return h(r)
 }
 
+//////////////////////////////////////////////////
+// Request
+
 type Request interface {
 	GetValue(name string) interface{}
 	GetString(name string) string
 }
 
+//////////////////////////////////////////////////
+// Server
+
 type Server struct {
-	red      *redis.Client
+	red      DbAdapter
 	opts     *Options
 	handlers map[string]Handler
 	queues   []string
@@ -61,6 +70,10 @@ func (r RequestImpl) GetString(k string) string {
 }
 
 func NewServer(red *redis.Client, opts *Options, handlers map[string]Handler) *Server {
+	return NewServerWithAdapter(&RedisAdapter{red}, opts, handlers)
+}
+
+func NewServerWithAdapter(red DbAdapter, opts *Options, handlers map[string]Handler) *Server {
 	srv := &Server{
 		red:      red,
 		handlers: handlers,
@@ -78,7 +91,7 @@ func NewServer(red *redis.Client, opts *Options, handlers map[string]Handler) *S
 
 func (s *Server) Run() {
 	for !s.isClosing() {
-		res, err := s.red.BLPop(time.Second, s.queues...).Result()
+		res, err := s.red.BLPop(time.Second, s.queues...)
 		if err == redis.Nil {
 			// nothing showed up
 			continue
@@ -183,7 +196,7 @@ func (s *Server) sendResponse(func_name string, req *RequestImpl, res interface{
 	}
 
 	qn := responseQueueName(s.opts.Prefix, func_name, req.Id)
-	if err = rpushEx(s.red, qn, string(msg), s.opts.ResultExpire); err != nil {
+	if err = s.red.RPushEx(qn, string(msg), s.opts.ResultExpire); err != nil {
 		log.Println("Error while sending reply: ", err)
 		return err
 	}

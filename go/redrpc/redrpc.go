@@ -3,8 +3,6 @@ package redrpc
 import (
 	"fmt"
 	"time"
-
-	"github.com/go-redis/redis"
 )
 
 func callQueueName(prefix, funcName string) string {
@@ -13,14 +11,6 @@ func callQueueName(prefix, funcName string) string {
 
 func responseQueueName(prefix, funcName, reqId string) string {
 	return fmt.Sprintf("%s:%s:result:%s", prefix, funcName, reqId)
-}
-
-func rpushEx(red *redis.Client, key, value string, ttl time.Duration) error {
-	pipe := red.Pipeline()
-	pipe.RPush(key, value)
-	pipe.Expire(key, ttl)
-	_, err := pipe.Exec()
-	return err
 }
 
 func timestamp() string {

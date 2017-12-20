@@ -11,11 +11,15 @@ import (
 )
 
 type Client struct {
-	red  *redis.Client
+	red  DbAdapter
 	opts *Options
 }
 
 func NewClient(red *redis.Client, opts *Options) *Client {
+	return NewClientWithAdapter(&RedisAdapter{red}, opts)
+}
+
+func NewClientWithAdapter(red DbAdapter, opts *Options) *Client {
 	cli := &Client{
 		red:  red,
 		opts: OptsWithDefaults(opts),
@@ -36,7 +40,7 @@ func (c *Client) CallAsync(funcName string, kwargs map[string]interface{}) (stri
 		return "", err
 	}
 
-	err = rpushEx(c.red, callQueueName(c.opts.Prefix, funcName), string(msgBytes), c.opts.RequestExpire)
+	err = c.red.RPushEx(callQueueName(c.opts.Prefix, funcName), string(msgBytes), c.opts.RequestExpire)
 	if err != nil {
 		return "", err
 	}
@@ -71,7 +75,7 @@ func (c *Client) Response(funcName, reqId string) (interface{}, error) {
 			waitTime = time.Second
 		}
 
-		res, err := c.red.BLPop(waitTime, queueName).Result()
+		res, err := c.red.BLPop(waitTime, queueName)
 		if err == redis.Nil {
 			// nothing showed up
 			continue
