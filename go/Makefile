@@ -2,7 +2,7 @@ BINARIES=exsrv
 
 all: $(BINARIES)
 
-exsrv: redrpc/*.go commands/exsrv/*.go
+exsrv: show-todos redrpc/*.go commands/exsrv/*.go
 	./scripts/go build -o "$@" github.com/Codility/redis-rpc/go/commands/exsrv
 
 .PHONY: clean
@@ -10,7 +10,7 @@ clean:
 	rm -rf $(BINARIES) .gopath
 
 .PHONY: test
-test: goimports govet
+test: show-todos goimports govet
 	./scripts/go test -v github.com/Codility/redis-rpc/go/redrpc
 
 .PHONY: govet
@@ -29,3 +29,10 @@ goimports:
 			exit 1; \
 		fi
 	@echo "goimports passed"
+
+.PHONY: show-todos
+show-todos:
+	@echo "---------- TODOs ----------"
+	@grep --line-number '// TODO' `find . -name \*.go | grep -v '\(/vendor/\|/.gopath/\)'` \
+		| perl -ple 's|^([^:]+:[^:]+:)[^/]*|sprintf("%-40s", $$1)|e'
+	@echo
