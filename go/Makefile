@@ -34,5 +34,5 @@ goimports:
 show-todos:
 	@echo "---------- TODOs ----------"
 	@grep --line-number '// TODO' `find . -name \*.go | grep -v '\(/vendor/\|/.gopath/\)'` \
-		| perl -ple 's|^([^:]+:[^:]+:)[^/]*|sprintf("%-40s", $$1)|e'
+		| LC_ALL=C perl -ple 's|^([^:]+:[^:]+:)[^/]*|sprintf("%-40s", $$1)|e'
 	@echo
