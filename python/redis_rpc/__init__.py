@@ -46,6 +46,8 @@ def warn_if_no_socket_timeout(redis):
 
 
 def format_for_logs(s, *, verbose):
+    if s is None:
+        return '-'
     if isinstance(s, bytes):
         s = s.decode()
     if not verbose and len(s) > 120:
@@ -54,14 +56,19 @@ def format_for_logs(s, *, verbose):
     return json.dumps(s)
 
 
+def format_exception_for_logs(exception, *, verbose):
+    if exception is None:
+        return '-'
+    return format_for_logs('%s: %s' % (type(exception).__name__,
+                                       str(exception)), verbose=verbose)
+
+
 def log_request(func_name, req_bytes, exception, result, msg, *, verbose):
     parts = [
         func_name,
         format_for_logs(req_bytes, verbose=verbose),
-        format_for_logs('%s: %s' % (type(exception).__name__,
-                                    str(exception)), verbose=verbose)
-        if exception else '-',
-        format_for_logs(result, verbose=verbose) if result else '-',
+        format_exception_for_logs(exception, verbose=verbose),
+        format_for_logs(result, verbose=verbose),
         msg,
     ]
 
