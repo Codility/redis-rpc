@@ -159,7 +159,7 @@ func mustStartRedisServer(port int, args ...string) *exec.Cmd {
 		if err == nil {
 			break
 		} else {
-			log.Print("%v", err)
+			log.Printf("%v", err)
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
