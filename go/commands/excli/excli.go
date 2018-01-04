@@ -31,7 +31,9 @@ func main() {
 		Addr: REDIS_URI,
 	})
 
-	cli := redrpc.NewClient(red, nil)
+	cli := redrpc.NewClient(red, &redrpc.Options{
+		Prefix: "rpc_example",
+	})
 	args := os.Args
 	if len(args) < 2 {
 		printUsage()
