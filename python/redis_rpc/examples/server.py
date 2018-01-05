@@ -23,7 +23,7 @@ def main():
     logging.basicConfig(level='INFO')
 
     redis = StrictRedis.from_url(REDIS_URI, socket_timeout=10)
-    srv = Server(redis, {'set': rpc_set, 'get': rpc_get}, 'rpc_example')
+    srv = Server(redis, {'set': rpc_set, 'get': rpc_get}, prefix='rpc_example')
     srv.quit_on_signals()
     print("Listening on", REDIS_URI, "queues:", srv.queue_names)
     srv.serve()

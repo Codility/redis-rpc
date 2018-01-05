@@ -1,0 +1,53 @@
+{
+	"version": 0,
+	"dependencies": [
+		{
+			"importpath": "github.com/go-redis/redis",
+			"repository": "https://github.com/go-redis/redis",
+			"vcs": "git",
+			"revision": "9c885d5ba8a22f260badcffde1649915fbeebfc0",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/kr/pretty",
+			"repository": "https://github.com/kr/pretty",
+			"vcs": "git",
+			"revision": "cfb55aafdaf3ec08f0db22699ab822c50091b1c4",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/kr/pty",
+			"repository": "https://github.com/kr/pty",
+			"vcs": "git",
+			"revision": "95d05c1eef33a45bd58676b6ce28d105839b8d0b",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/kr/text",
+			"repository": "https://github.com/kr/text",
+			"vcs": "git",
+			"revision": "7cafcd837844e784b526369c9bce262804aebc60",
+			"branch": "main",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/satori/go.uuid",
+			"repository": "https://github.com/satori/go.uuid",
+			"vcs": "git",
+			"revision": "5bf94b69c6b68ee1b541973bb8e1144db23a194b",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "github.com/stvp/assert",
+			"repository": "https://github.com/stvp/assert",
+			"vcs": "git",
+			"revision": "4bc16443988bace8e1b42d62d3601f70d74e4638",
+			"branch": "master",
+			"notests": true
+		}
+	]
+}

@@ -1,0 +1,5 @@
+#!/bin/sh
+set -e
+
+. "$(git rev-parse --show-toplevel)/go/scripts/goenv.sh"
+exec go "${@}"

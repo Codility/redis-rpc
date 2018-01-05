@@ -1,6 +1,16 @@
-language: python
-python:
-  - 3.5
-  - 3.6
-script:
-  - cd python && python setup.py test
+matrix:
+  include:
+    - language: python
+      python: 3.5
+      script:
+        - cd python && python setup.py test
+
+    - language: python
+      python: 3.6
+      script:
+        - cd python && python setup.py test
+
+    - language: go
+      go: 1.9
+      script:
+        - cd go && make exsrv test
