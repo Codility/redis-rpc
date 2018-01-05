@@ -144,7 +144,8 @@ class Server:
                  prefix='redis_rpc',
                  result_expire=RESULT_EXPIRE,
                  blpop_timeout=BLPOP_TIMEOUT,
-                 verbose=False):
+                 verbose=False,
+                 limit=None):
         self._redis = redis
         self._prefix = prefix
         self._expire = result_expire
@@ -156,6 +157,8 @@ class Server:
         self._call_idx = 0
         self._quit = False
         self._verbose = False
+        self._limit = limit
+        self._served = 0
         warn_if_no_socket_timeout(redis)
 
     @property
@@ -198,6 +201,11 @@ class Server:
         else:
             log_request(func_name, req_bytes, None, json.dumps(res), 'OK',
                         verbose=self._verbose)
+
+        self._served += 1
+        if self._limit is not None and self._served >= self._limit:
+            log.info('Served %d requests, will quit.', self._served)
+            self._quit = True
 
     def send_result(self, func_name, req_id, **kwargs):
         msg = {'ts': datetime.now().isoformat()}
