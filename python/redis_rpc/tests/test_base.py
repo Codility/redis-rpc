@@ -97,6 +97,19 @@ def test_server_rotates_queues():
                                   b'redis_rpc:b:calls',
                                   b'redis_rpc:c:calls']
 
+def test_server_limit():
+    n_calls = 0
+
+    def inc():
+        nonlocal n_calls
+        n_calls += 1
+
+    mockredis = Mock()
+    mockredis.blpop.return_value = b'redis_rpc:inc:calls', b'{"id": "xxx"}'
+
+    srv = Server(mockredis, {'inc': inc}, limit=42)
+    srv.serve()
+    assert n_calls == 42
 
 def test_client_timeout():
     mockredis = Mock()
