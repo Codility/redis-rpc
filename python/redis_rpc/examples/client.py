@@ -21,7 +21,7 @@ Examples:
 
 def main():
     redis = StrictRedis.from_url("redis://localhost:6379/0", socket_timeout=10)
-    cli = Client(redis)
+    cli = Client(redis, prefix='rpc_example')
 
     if sys.argv[1] == 'get':
         print(json.dumps(cli.call('get', k=sys.argv[2])))

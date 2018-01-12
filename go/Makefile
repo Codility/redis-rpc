@@ -1,9 +1,12 @@
-BINARIES=exsrv
+BINARIES=exsrv excli
 
 all: $(BINARIES)
 
 exsrv: show-todos redrpc/*.go commands/exsrv/*.go
 	./scripts/go build -o "$@" github.com/Codility/redis-rpc/go/commands/exsrv
+
+excli: redrpc/*.go commands/excli/*.go
+	./scripts/go build -o "$@" github.com/Codility/redis-rpc/go/commands/excli
 
 .PHONY: clean
 clean:

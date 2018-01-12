@@ -45,22 +45,38 @@ def warn_if_no_socket_timeout(redis):
                     'problems between Redis and RPC client or server.')
 
 
-def escape_for_logs(v):
+def format_for_logs(s, *, verbose):
+    if s is None:
+        return '-'
+    if isinstance(s, bytes):
+        s = s.decode()
+    if not verbose and len(s) > 120:
+        return s[:120] + '...'
     # quick and dirty way to avoid log forging/injection
-    return json.dumps(v)
+    return json.dumps(s)
 
 
-def log_request(func_name, req_bytes, exception, msg):
+def format_exception_for_logs(exception, *, verbose):
+    if exception is None:
+        return '-'
+    return format_for_logs('%s: %s' % (type(exception).__name__,
+                                       str(exception)), verbose=verbose)
+
+
+def log_request(func_name, req_bytes, exception, result, msg, *, verbose):
+    parts = [
+        func_name,
+        format_for_logs(req_bytes, verbose=verbose),
+        format_exception_for_logs(exception, verbose=verbose),
+        format_for_logs(result, verbose=verbose),
+        msg,
+    ]
+
+    fmt = ' '.join(['%s']*len(parts))
     if exception:
-        log.exception('%s %s %s %s',
-                      func_name,
-                      escape_for_logs(req_bytes.decode()),
-                      escape_for_logs('%s: %s' % (type(exception).__name__, str(exception))),
-                      msg)
+        log.exception(fmt, *parts)
     else:
-        log.info('%s %s - %s', func_name,
-                 escape_for_logs(req_bytes.decode()),
-                 msg)
+        log.info(fmt, *parts)
 
 
 # Atomic RPUSH + EXPIRE.
@@ -127,7 +143,9 @@ class Server:
     def __init__(self, redis, func_map,
                  prefix='redis_rpc',
                  result_expire=RESULT_EXPIRE,
-                 blpop_timeout=BLPOP_TIMEOUT):
+                 blpop_timeout=BLPOP_TIMEOUT,
+                 verbose=False,
+                 limit=None):
         self._redis = redis
         self._prefix = prefix
         self._expire = result_expire
@@ -138,6 +156,9 @@ class Server:
         self._queue_names = sorted((self._queue_map.keys()))
         self._call_idx = 0
         self._quit = False
+        self._verbose = False
+        self._limit = limit
+        self._served = 0
         warn_if_no_socket_timeout(redis)
 
     @property
@@ -163,20 +184,28 @@ class Server:
         try:
             req = json.loads(req_bytes.decode())
         except Exception as e:
-            log_request(func_name, req_bytes, e,
+            log_request(func_name, req_bytes, e, None,
                         'Could not parse incoming message')
             return
 
         try:
             res = func(**req.get('kw', {}))
-            self.send_result(func_name, req['id'], res=res)
+            self.send_result(func_name, req['id'], res=res,
+                             verbose=self._verbose)
         except Exception as e:
             # TODO: format information about exception in a nicer way
-            log_request(func_name, req_bytes, e,
-                        'Caught exception while calling %s' % func_name)
+            log_request(func_name, req_bytes, e, None,
+                        'Caught exception while calling %s' % func_name,
+                        verbose=self._verbose)
             self.send_result(func_name, req['id'], err=repr(e))
         else:
-            log_request(func_name, req_bytes, None, 'OK')
+            log_request(func_name, req_bytes, None, json.dumps(res), 'OK',
+                        verbose=self._verbose)
+
+        self._served += 1
+        if self._limit is not None and self._served >= self._limit:
+            log.info('Served %d requests, will quit.', self._served)
+            self._quit = True
 
     def send_result(self, func_name, req_id, **kwargs):
         msg = {'ts': datetime.now().isoformat()}
