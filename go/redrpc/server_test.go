@@ -135,7 +135,7 @@ func TestServerRotatesQueues(t *testing.T) {
 	blpopCalls := [][]string{}
 
 	red := &TestDbAdapter{
-		blpop: func(timeout time.Duration, keys ...string) ([]string, error) {
+		blpopMock: func(timeout time.Duration, keys ...string) ([]string, error) {
 			blpopCalls = append(blpopCalls, keys)
 			return nil, nil
 		},
