@@ -50,8 +50,10 @@ def test_base_usage(redisdb):
         assert cli.call('set', k='k2', v=None) is None
         assert cli.call('get', k='k2') is None
 
-        with pytest.raises(RemoteException):
+        with pytest.raises(RemoteException) as excinfo:
             cli.call('get', k='unknown-key')
+
+        assert "KeyError: 'unknown-key'" in str(excinfo.value)
 
         with pytest.raises(RemoteException):
             cli.call('get', unknown_arg='some-value')

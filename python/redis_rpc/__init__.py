@@ -3,6 +3,7 @@ import logging
 import math
 import signal
 import time
+import traceback
 from datetime import datetime
 from uuid import uuid4
 
@@ -197,7 +198,8 @@ class Server:
             log_request(func_name, req_bytes, e, None,
                         'Caught exception while calling %s' % func_name,
                         verbose=self._verbose)
-            self.send_result(func_name, req['id'], err=repr(e))
+            err = traceback.format_exc()
+            self.send_result(func_name, req['id'], err=err)
         else:
             log_request(func_name, req_bytes, None, json.dumps(res), 'OK',
                         verbose=self._verbose)
