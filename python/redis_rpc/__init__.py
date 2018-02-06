@@ -1,3 +1,5 @@
+import re
+import sys
 import json
 import logging
 import math
@@ -23,7 +25,15 @@ class RPCTimeout(Exception):
 
 
 class RemoteException(Exception):
-    pass
+    def __init__(self, message, traceback=None):
+        self.message = message
+        self.traceback = traceback
+
+    def __str__(self):
+        s = self.message
+        if self.traceback:
+            s += '\n\nRemote traceback:\n' + self.traceback
+        return s
 
 
 def call_queue_name(prefix, func_name):
@@ -132,7 +142,7 @@ class Client:
         (_, res_bytes) = popped
         res = json.loads(res_bytes.decode())
         if res.get('err'):
-            raise RemoteException(res['err'])
+            raise RemoteException(res['err'], res.get('err_traceback'))
         return res.get('res')
 
     def call(self, func_name, **kwargs):
@@ -198,8 +208,10 @@ class Server:
             log_request(func_name, req_bytes, e, None,
                         'Caught exception while calling %s' % func_name,
                         verbose=self._verbose)
-            err = traceback.format_exc()
-            self.send_result(func_name, req['id'], err=err)
+            err = '{}: {}'.format(type(e).__name__, str(e))
+            err_traceback = re.sub(r'^.*\n', '', traceback.format_exc())
+            self.send_result(func_name, req['id'],
+                             err=err, err_traceback=err_traceback)
         else:
             log_request(func_name, req_bytes, None, json.dumps(res), 'OK',
                         verbose=self._verbose)
