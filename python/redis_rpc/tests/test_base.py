@@ -113,6 +113,7 @@ def test_server_limit():
     srv.serve()
     assert n_calls == 42
 
+
 def test_client_timeout():
     mockredis = Mock()
 
@@ -122,3 +123,15 @@ def test_client_timeout():
     with pytest.raises(RPCTimeout):
         cli.call('fake_func')
     assert mockredis.blpop.call_count > 1
+
+
+def test_override_response_timeout(redisdb):
+    t1 = 0.5
+    t2 = 1.5
+    t3 = 3.0
+
+    with rpc_server(redisdb, {'sleep': lambda t: time.sleep(t)}):
+        cli = Client(redisdb, response_timeout=t1)
+        with pytest.raises(RPCTimeout):
+            cli.call('sleep', t=t2)
+        cli.call('sleep', t=t2, response_timeout=t3)

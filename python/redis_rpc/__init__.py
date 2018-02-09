@@ -124,9 +124,11 @@ class Client:
 
         return req_id
 
-    def response(self, func_name, req_id):
+    def response(self, func_name, req_id, *, response_timeout=None):
         start_ts = time.time()
-        deadline_ts = start_ts + self._response_timeout
+        if response_timeout is None:
+            response_timeout = self._response_timeout
+        deadline_ts = start_ts + response_timeout
 
         qn = response_queue_name(self._prefix, func_name, req_id)
 
@@ -145,9 +147,10 @@ class Client:
             raise RemoteException(res['err'], res.get('err_traceback'))
         return res.get('res')
 
-    def call(self, func_name, **kwargs):
+    def call(self, func_name, *, response_timeout=None, **kwargs):
         req_id = self.call_async(func_name, **kwargs)
-        return self.response(func_name, req_id)
+        return self.response(func_name, req_id,
+                             response_timeout=response_timeout)
 
 
 class Server:
