@@ -18,6 +18,8 @@ BLPOP_TIMEOUT = 1
 RESPONSE_TIMEOUT = 1
 REQUEST_EXPIRE = 120
 RESULT_EXPIRE = 120
+HEART_BEAT_PERIOD = 3
+HEART_BEAT_EXPIRE = 5
 
 
 class RPCTimeout(Exception):
@@ -154,12 +156,14 @@ class Client:
 
 
 class Server:
-    def __init__(self, redis, func_map,
+    def __init__(self, name, id, redis, func_map,
                  prefix='redis_rpc',
                  result_expire=RESULT_EXPIRE,
                  blpop_timeout=BLPOP_TIMEOUT,
                  verbose=False,
                  limit=None):
+        self.name = name
+        self.id = id
         self._redis = redis
         self._prefix = prefix
         self._expire = result_expire
@@ -182,6 +186,11 @@ class Server:
     def serve(self):
         while not self._quit:
             self.serve_one()
+
+    def heart_beat(self):
+        while not self._quit:
+            self._redis.set('{}_{}_alive'.format(self.name, self.id), True, ex=HEART_BEAT_EXPIRE)
+            time.sleep(HEART_BEAT_PERIOD)
 
     def quit(self):
         self._quit = True
