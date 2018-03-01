@@ -8,10 +8,10 @@ from unittest.mock import Mock
 
 
 @contextmanager
-def rpc_server(redis, func_map, **kwargs):
+def rpc_server(redis, func_map, name='X', id='42', **kwargs):
 
     def server():
-        rpc = Server(redis, func_map, **kwargs)
+        rpc = Server(name, id, redis, func_map, **kwargs)
         rpc.serve()
 
     rpc_proc = Process(target=server)
@@ -25,7 +25,7 @@ def rpc_server(redis, func_map, **kwargs):
 
 
 def test_base_usage(redisdb):
-    cli = Client(redisdb)
+    cli = Client('X', '42', redisdb)
 
     with pytest.raises(RPCTimeout):
         cli.call('get', k='k0')
@@ -60,7 +60,7 @@ def test_base_usage(redisdb):
 
 
 def test_expiry_times(redisdb):
-    cli = Client(redisdb, request_expire=10)
+    cli = Client('X', '44', redisdb, request_expire=10)
 
     req_id = cli.call_async('zero')
     assert 0 < redisdb.ttl(call_queue_name('redis_rpc', 'zero')) <= 10
@@ -119,7 +119,7 @@ def test_client_timeout():
 
     mockredis.blpop.return_value = None
 
-    cli = Client(mockredis, response_timeout=1)
+    cli = Client('X', '44', mockredis, response_timeout=1)
     with pytest.raises(RPCTimeout):
         cli.call('fake_func')
     assert mockredis.blpop.call_count > 1
@@ -131,7 +131,19 @@ def test_override_response_timeout(redisdb):
     t3 = 3.0
 
     with rpc_server(redisdb, {'sleep': lambda t: time.sleep(t)}):
-        cli = Client(redisdb, response_timeout=t1)
+        cli = Client('X', '44', redisdb, response_timeout=t1)
         with pytest.raises(RPCTimeout):
             cli.call('sleep', t=t2)
         cli.call('sleep', t=t2, response_timeout=t3)
+
+
+def test_heaertbeat(redisdb):
+    cli = Client('X', '44', redisdb)
+    with rpc_server(redisdb, {'f': lambda x: x}):
+        assert cli.is_online()
+        assert cli.is_online(id='42')
+        assert not cli.is_online(id='44')
+        time.sleep(6)
+        assert cli.is_online()
+    time.sleep(6)
+    assert not cli.is_online()
