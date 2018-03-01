@@ -102,10 +102,12 @@ def rpush_ex(redis, key, value, ttl):
 
 
 class Client:
-    def __init__(self, redis, prefix='redis_rpc',
+    def __init__(self, name, id, redis, prefix='redis_rpc',
                  request_expire=REQUEST_EXPIRE,
                  blpop_timeout=BLPOP_TIMEOUT,
                  response_timeout=RESPONSE_TIMEOUT):
+        self.name = name
+        self.id = id
         self._redis = redis
         self._prefix = prefix
         self._expire = request_expire
@@ -154,6 +156,17 @@ class Client:
         return self.response(func_name, req_id,
                              response_timeout=response_timeout)
 
+    def is_online(self, server_id=None):
+        if server_id is not None:
+            key = '{}:{}:{}:alive'.format(self.prefix, self.name, server_id)
+            if self._redis.get(key):
+                return True
+            return False
+        pattern = '{}:{}:*:alive'.format(self.prefix, self.name)
+        for server in self._redis.scan_iter(match=pattern):
+            return True
+        return False
+
 
 class Server:
     def __init__(self, name, id, redis, func_map,
@@ -189,7 +202,9 @@ class Server:
 
     def heart_beat(self):
         while not self._quit:
-            self._redis.set('{}_{}_alive'.format(self.name, self.id), True, ex=HEART_BEAT_EXPIRE)
+            self._redis.set('{}:{}:{}:alive'.format(
+                self.prefix, self.name, self.id), True, ex=HEART_BEAT_EXPIRE
+            )
             time.sleep(HEART_BEAT_PERIOD)
 
     def quit(self):
