@@ -227,7 +227,7 @@ class Server:
     def heartbeat(self):
         while not self._quit:
             self._redis.set('{}:{}:{}:alive'.format(
-                self._prefix, self._name, self._id), True, ex=self._heartbeat_expire
+                self._prefix, self._name, self._id), '1', ex=self._heartbeat_expire
             )
             time.sleep(self._heartbeat_period)
 
