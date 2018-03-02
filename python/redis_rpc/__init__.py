@@ -1,5 +1,4 @@
 import re
-import sys
 import json
 import logging
 import math
@@ -9,6 +8,7 @@ import threading
 import traceback
 from datetime import datetime
 from uuid import uuid4
+import contextlib
 
 
 log = logging.getLogger('redis-rpc')
@@ -213,25 +213,31 @@ class Server:
             while not self._quit:
                 self.serve_one()
 
-        heartbeat_thread = threading.Thread(target=self.heartbeat)
-        heartbeat_thread.start()
-        if num_threads == 1:
-            _serve()
-        else:
-            assert num_threads > 1
-            threads = [threading.Thread(target=_serve) for i in range(num_threads)]
-            for t in threads:
-                t.start()
-            for t in threads:
-                t.join()
-        heartbeat_thread.join()
+        with contextlib.ExitStack() as stack:
+            heartbeat_thread = threading.Thread(target=self.heartbeat)
+            heartbeat_thread.start()
+            stack.callback(heartbeat_thread.join)
+            if num_threads == 1:
+                _serve()
+            else:
+                assert num_threads > 1
+                threads = [threading.Thread(target=_serve) for i in range(num_threads)]
+                for t in threads:
+                    t.start()
+                    stack.callback(t.join)
 
     def heartbeat(self):
+        last = time.time() - self._heartbeat_period
         while not self._quit:
-            self._redis.set('{}:{}:{}:alive'.format(
-                self._prefix, self._name, self._id), '1', ex=self._heartbeat_expire
-            )
-            time.sleep(self._heartbeat_period)
+            now = time.time()
+            remaining = last + self._heartbeat_period - now
+            if remaining <= 0:
+                self._redis.set('{}:{}:{}:alive'.format(
+                    self._prefix, self._name, self._id), '1', ex=self._heartbeat_expire
+                )
+                last = now
+            else:
+                time.sleep(min(self._blpop_timeout, remaining))
 
     def quit(self):
         self._quit = True
