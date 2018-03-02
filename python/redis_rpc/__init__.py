@@ -5,6 +5,7 @@ import logging
 import math
 import signal
 import time
+import threading
 import traceback
 from datetime import datetime
 from uuid import uuid4
@@ -201,11 +202,25 @@ class Server:
     def queue_names(self):
         return list(self._queue_names)
 
-    def serve(self):
-        while not self._quit:
-            self.serve_one()
+    def serve(self, num_threads=1):
+        def _serve():
+            while not self._quit:
+                self.serve_one()
 
-    def heart_beat(self):
+        heartbeat_thread = threading.Thread(target=heartbeat)
+        heartbeat_thread.start()
+        if num_threads == 1:
+            _serve()
+        else:
+            assert num_threads > 1
+            threads = [threading.Thread(target=_serve) for i in range(num_threads)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+        heartbeat_thread.join()
+
+    def heartbeat(self):
         while not self._quit:
             self._redis.set('{}:{}:{}:alive'.format(
                 self.prefix, self.name, self.id), True, ex=HEART_BEAT_EXPIRE
