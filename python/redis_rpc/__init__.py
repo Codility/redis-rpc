@@ -1,13 +1,14 @@
 import re
-import sys
 import json
 import logging
 import math
 import signal
 import time
+import threading
 import traceback
 from datetime import datetime
 from uuid import uuid4
+import contextlib
 
 
 log = logging.getLogger('redis-rpc')
@@ -18,6 +19,8 @@ BLPOP_TIMEOUT = 1
 RESPONSE_TIMEOUT = 1
 REQUEST_EXPIRE = 120
 RESULT_EXPIRE = 120
+HEARTBEAT_PERIOD = 2
+HEARTBEAT_EXPIRE = 4
 
 
 class RPCTimeout(Exception):
@@ -100,10 +103,15 @@ def rpush_ex(redis, key, value, ttl):
 
 
 class Client:
-    def __init__(self, redis, prefix='redis_rpc',
+    def __init__(self, redis,
+                 name='',
+                 id='',
+                 prefix='redis_rpc',
                  request_expire=REQUEST_EXPIRE,
                  blpop_timeout=BLPOP_TIMEOUT,
                  response_timeout=RESPONSE_TIMEOUT):
+        self._name = name
+        self._id = id
         self._redis = redis
         self._prefix = prefix
         self._expire = request_expire
@@ -152,19 +160,40 @@ class Client:
         return self.response(func_name, req_id,
                              response_timeout=response_timeout)
 
+    def get_online_servers(self, server_id=None):
+        if server_id is None:
+            match = '{}:{}:*:alive'.format(self._prefix, self._name)
+        else:
+            match = '{}:{}:{}:alive'.format(self._prefix, self._name, server_id)
+        result = []
+        for key in self._redis.scan_iter(match=match):
+            result.append(key.decode().split(':')[-2])
+        return result
+
+    def is_online(self, server_id=None):
+        return len(self.get_online_servers(server_id)) > 0
+
 
 class Server:
     def __init__(self, redis, func_map,
+                 name='',
+                 id='',
                  prefix='redis_rpc',
                  result_expire=RESULT_EXPIRE,
                  blpop_timeout=BLPOP_TIMEOUT,
+                 heartbeat_period=HEARTBEAT_PERIOD,
+                 heartbeat_expire=HEARTBEAT_EXPIRE,
                  verbose=False,
                  limit=None):
+        self._name = name
+        self._id = id
         self._redis = redis
         self._prefix = prefix
         self._expire = result_expire
         self._blpop_timeout = blpop_timeout
         self._func_map = func_map
+        self._heartbeat_period = heartbeat_period
+        self._heartbeat_expire = heartbeat_expire
         self._queue_map = {call_queue_name(self._prefix, name): (name, func)
                            for (name, func) in func_map.items()}
         self._queue_names = sorted((self._queue_map.keys()))
@@ -179,9 +208,36 @@ class Server:
     def queue_names(self):
         return list(self._queue_names)
 
-    def serve(self):
+    def serve(self, num_threads=1):
+        def _serve():
+            while not self._quit:
+                self.serve_one()
+
+        with contextlib.ExitStack() as stack:
+            heartbeat_thread = threading.Thread(target=self.heartbeat)
+            heartbeat_thread.start()
+            stack.callback(heartbeat_thread.join)
+            if num_threads == 1:
+                _serve()
+            else:
+                assert num_threads > 1
+                threads = [threading.Thread(target=_serve) for i in range(num_threads)]
+                for t in threads:
+                    t.start()
+                    stack.callback(t.join)
+
+    def heartbeat(self):
+        last = time.time() - self._heartbeat_period
         while not self._quit:
-            self.serve_one()
+            now = time.time()
+            remaining = last + self._heartbeat_period - now
+            if remaining <= 0:
+                self._redis.set('{}:{}:{}:alive'.format(
+                    self._prefix, self._name, self._id), '1', ex=self._heartbeat_expire
+                )
+                last = now
+            else:
+                time.sleep(min(self._blpop_timeout, remaining))
 
     def quit(self):
         self._quit = True

@@ -135,3 +135,24 @@ def test_override_response_timeout(redisdb):
         with pytest.raises(RPCTimeout):
             cli.call('sleep', t=t2)
         cli.call('sleep', t=t2, response_timeout=t3)
+
+
+def test_heartbeat(redisdb):
+    cli = Client(redisdb, name='X', id='44')
+    with rpc_server(
+        redisdb,
+        {'f': lambda x: x},
+        name='X', id='42',
+        heartbeat_period=0.5,
+        heartbeat_expire=1
+    ):
+        time.sleep(0.2)  # Wait until heartbeat starts
+        assert cli.is_online()
+        assert cli.is_online(server_id='42')
+        assert not cli.is_online(server_id='43')
+        assert cli.get_online_servers() == ['42']
+        time.sleep(1)
+        assert cli.is_online()
+    time.sleep(1.5)
+    assert not cli.is_online()
+    assert cli.get_online_servers() == []
