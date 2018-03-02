@@ -19,8 +19,8 @@ BLPOP_TIMEOUT = 1
 RESPONSE_TIMEOUT = 1
 REQUEST_EXPIRE = 120
 RESULT_EXPIRE = 120
-HEART_BEAT_PERIOD = 3
-HEART_BEAT_EXPIRE = 5
+HEARTBEAT_PERIOD = 3
+HEARTBEAT_EXPIRE = 5
 
 
 class RPCTimeout(Exception):
@@ -179,6 +179,8 @@ class Server:
                  prefix='redis_rpc',
                  result_expire=RESULT_EXPIRE,
                  blpop_timeout=BLPOP_TIMEOUT,
+                 heartbeat_period=HEARTBEAT_PERIOD,
+                 heartbeat_expire=HEARTBEAT_EXPIRE,
                  verbose=False,
                  limit=None):
         self.name = name
@@ -188,6 +190,8 @@ class Server:
         self._expire = result_expire
         self._blpop_timeout = blpop_timeout
         self._func_map = func_map
+        self._heartbeat_period = heartbeat_period
+        self._heartbeat_expire = heartbeat_expire
         self._queue_map = {call_queue_name(self._prefix, name): (name, func)
                            for (name, func) in func_map.items()}
         self._queue_names = sorted((self._queue_map.keys()))
@@ -223,9 +227,9 @@ class Server:
     def heartbeat(self):
         while not self._quit:
             self._redis.set('{}:{}:{}:alive'.format(
-                self.prefix, self.name, self.id), True, ex=HEART_BEAT_EXPIRE
+                self.prefix, self.name, self.id), True, ex=self._heartbeat_expire
             )
-            time.sleep(HEART_BEAT_PERIOD)
+            time.sleep(self._heartbeat_period)
 
     def quit(self):
         self._quit = True
