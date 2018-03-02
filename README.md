@@ -84,5 +84,5 @@ Heartbeat
 ---------
 
 The server also implements a heartbeat thread. To check if a server is online,
-look for the `{prefix}:{server_name}:{server_id}:alive` key in Redis. When the
+look for the `{prefix}:{server_kind}:{server_id}:alive` key in Redis. When the
 server goes offline, its key expires.

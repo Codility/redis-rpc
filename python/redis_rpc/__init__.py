@@ -47,8 +47,8 @@ def response_queue_name(prefix, func_name, req_id):
     return ('%s:%s:result:%s' % (prefix, func_name, req_id)).encode('utf-8')
 
 
-def heartbeat_key_name(prefix, server_name, server_id):
-    return ('%s:%s:%s:alive' % (prefix, server_name, server_id)).encode('utf-8')
+def heartbeat_key_name(prefix, server_kind, server_id):
+    return ('%s:%s:%s:alive' % (prefix, server_kind, server_id)).encode('utf-8')
 
 
 def rotated(l, places):
@@ -160,24 +160,24 @@ class Client:
         return self.response(func_name, req_id,
                              response_timeout=response_timeout)
 
-    def get_online_servers(self, server_name):
-        match = heartbeat_key_name(self._prefix, server_name, '*')
+    def get_online_servers(self, kind):
+        match = heartbeat_key_name(self._prefix, kind, '*')
         result = []
         for key in self._redis.scan_iter(match=match):
             result.append(key.decode().split(':')[-2])
         return result
 
-    def is_server_online(self, server_name, server_id=None):
-        servers = self.get_online_servers(server_name)
-        if server_id is not None:
-            return server_id in servers
+    def is_server_online(self, kind, id=None):
+        servers = self.get_online_servers(kind)
+        if id is not None:
+            return id in servers
         else:
             return len(servers) > 0
 
 
 class Server:
     def __init__(self, redis, func_map,
-                 name='',
+                 kind='',
                  id='',
                  prefix='redis_rpc',
                  result_expire=RESULT_EXPIRE,
@@ -186,7 +186,7 @@ class Server:
                  heartbeat_expire=HEARTBEAT_EXPIRE,
                  verbose=False,
                  limit=None):
-        self._name = name
+        self._kind = kind
         self._id = id
         self._redis = redis
         self._prefix = prefix
@@ -226,20 +226,20 @@ class Server:
             self.serve_one()
 
     @contextlib.contextmanager
-    def heartbeat_thread(self, name=None, id=None):
-        thread = threading.Thread(target=self.heartbeat, args=(name, id))
+    def heartbeat_thread(self, kind=None, id=None):
+        thread = threading.Thread(target=self.heartbeat, args=(kind, id))
         thread.start()
         try:
             yield
         finally:
             thread.join()
 
-    def heartbeat(self, name=None, id=None):
-        if name is None:
-            name = self._name
+    def heartbeat(self, kind=None, id=None):
+        if kind is None:
+            kind = self._kind
         if id is None:
             id = self._id
-        key = heartbeat_key_name(self._prefix, name, id)
+        key = heartbeat_key_name(self._prefix, kind, id)
         last = time.time() - self._heartbeat_period
         while not self._quit:
             now = time.time()

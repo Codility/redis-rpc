@@ -142,7 +142,7 @@ def test_heartbeat(redisdb):
     with rpc_server(
         redisdb,
         {'f': lambda x: x},
-        name='X', id='42',
+        kind='X', id='42',
         heartbeat_period=0.5,
         heartbeat_expire=1
     ):
