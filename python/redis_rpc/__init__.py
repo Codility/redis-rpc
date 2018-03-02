@@ -102,7 +102,10 @@ def rpush_ex(redis, key, value, ttl):
 
 
 class Client:
-    def __init__(self, name, id, redis, prefix='redis_rpc',
+    def __init__(self, redis,
+                 name='',
+                 id='',
+                 prefix='redis_rpc',
                  request_expire=REQUEST_EXPIRE,
                  blpop_timeout=BLPOP_TIMEOUT,
                  response_timeout=RESPONSE_TIMEOUT):
@@ -169,7 +172,9 @@ class Client:
 
 
 class Server:
-    def __init__(self, name, id, redis, func_map,
+    def __init__(self, redis, func_map,
+                 name='',
+                 id='',
                  prefix='redis_rpc',
                  result_expire=RESULT_EXPIRE,
                  blpop_timeout=BLPOP_TIMEOUT,
