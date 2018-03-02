@@ -160,18 +160,19 @@ class Client:
         return self.response(func_name, req_id,
                              response_timeout=response_timeout)
 
-    def get_online_servers(self, server_name, server_id=None):
-        if server_id is None:
-            match = heartbeat_key_name(self._prefix, server_name, '*')
-        else:
-            match = heartbeat_key_name(self._prefix, server_name, server_id)
+    def get_online_servers(self, server_name):
+        match = heartbeat_key_name(self._prefix, server_name, '*')
         result = []
         for key in self._redis.scan_iter(match=match):
             result.append(key.decode().split(':')[-2])
         return result
 
     def is_server_online(self, server_name, server_id=None):
-        return len(self.get_online_servers(server_name, server_id)) > 0
+        servers = self.get_online_servers(server_name)
+        if server_id is not None:
+            return server_id in servers
+        else:
+            return len(servers) > 0
 
 
 class Server:
