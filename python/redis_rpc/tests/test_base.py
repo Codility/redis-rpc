@@ -138,7 +138,7 @@ def test_override_response_timeout(redisdb):
 
 
 def test_heartbeat(redisdb):
-    cli = Client(redisdb, name='X', id='44')
+    cli = Client(redisdb)
     with rpc_server(
         redisdb,
         {'f': lambda x: x},
@@ -147,12 +147,12 @@ def test_heartbeat(redisdb):
         heartbeat_expire=1
     ):
         time.sleep(0.2)  # Wait until heartbeat starts
-        assert cli.is_online()
-        assert cli.is_online(server_id='42')
-        assert not cli.is_online(server_id='43')
-        assert cli.get_online_servers() == ['42']
+        assert cli.is_server_online('X')
+        assert cli.is_server_online('X', '42')
+        assert not cli.is_server_online('X', '43')
+        assert cli.get_online_servers('X') == ['42']
         time.sleep(1)
-        assert cli.is_online()
+        assert cli.is_server_online('X')
     time.sleep(1.5)
-    assert not cli.is_online()
-    assert cli.get_online_servers() == []
+    assert not cli.is_server_online('X')
+    assert cli.get_online_servers('X') == []
