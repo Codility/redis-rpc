@@ -225,16 +225,20 @@ class Server:
             self.serve_one()
 
     @contextlib.contextmanager
-    def heartbeat_thread(self):
-        thread = threading.Thread(target=self.heartbeat)
+    def heartbeat_thread(self, name=None, id=None):
+        thread = threading.Thread(target=self.heartbeat, args=(name, id))
         thread.start()
         try:
             yield
         finally:
             thread.join()
 
-    def heartbeat(self):
-        key = heartbeat_key_name(self._prefix, self._name, self._id)
+    def heartbeat(self, name=None, id=None):
+        if name is None:
+            name = self._name
+        if id is None:
+            id = self._id
+        key = heartbeat_key_name(self._prefix, name, id)
         last = time.time() - self._heartbeat_period
         while not self._quit:
             now = time.time()
