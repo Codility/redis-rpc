@@ -8,11 +8,15 @@ from unittest.mock import Mock
 
 
 @contextmanager
-def rpc_server(redis, func_map, **kwargs):
+def rpc_server(redis, func_map, kind=None, id=None, **kwargs):
 
     def server():
         rpc = Server(redis, func_map, **kwargs)
-        rpc.serve()
+        if kind and id:
+            with rpc.heartbeat_thread(kind, id):
+                rpc.serve()
+        else:
+            rpc.serve()
 
     rpc_proc = Process(target=server)
     rpc_proc.start()
@@ -142,9 +146,9 @@ def test_heartbeat(redisdb):
     with rpc_server(
         redisdb,
         {'f': lambda x: x},
-        kind='X', id='42',
         heartbeat_period=0.5,
-        heartbeat_expire=1
+        heartbeat_expire=1,
+        kind='X', id='42',
     ):
         time.sleep(0.2)  # Wait until heartbeat starts
         assert cli.is_server_online('X')

@@ -177,8 +177,6 @@ class Client:
 
 class Server:
     def __init__(self, redis, func_map,
-                 kind='',
-                 id='',
                  prefix='redis_rpc',
                  result_expire=RESULT_EXPIRE,
                  blpop_timeout=BLPOP_TIMEOUT,
@@ -186,8 +184,6 @@ class Server:
                  heartbeat_expire=HEARTBEAT_EXPIRE,
                  verbose=False,
                  limit=None):
-        self._kind = kind
-        self._id = id
         self._redis = redis
         self._prefix = prefix
         self._expire = result_expire
@@ -211,7 +207,6 @@ class Server:
 
     def serve(self, num_threads=1):
         with contextlib.ExitStack() as stack:
-            stack.enter_context(self.heartbeat_thread())
             if num_threads == 1:
                 self.simple_serve()
             else:
@@ -226,7 +221,7 @@ class Server:
             self.serve_one()
 
     @contextlib.contextmanager
-    def heartbeat_thread(self, kind=None, id=None):
+    def heartbeat_thread(self, kind, id):
         thread = threading.Thread(target=self.heartbeat, args=(kind, id))
         thread.start()
         try:
@@ -234,11 +229,7 @@ class Server:
         finally:
             thread.join()
 
-    def heartbeat(self, kind=None, id=None):
-        if kind is None:
-            kind = self._kind
-        if id is None:
-            id = self._id
+    def heartbeat(self, kind, id):
         key = heartbeat_key_name(self._prefix, kind, id)
         last = time.time() - self._heartbeat_period
         while not self._quit:
