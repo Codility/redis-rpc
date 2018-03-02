@@ -47,6 +47,10 @@ def response_queue_name(prefix, func_name, req_id):
     return ('%s:%s:result:%s' % (prefix, func_name, req_id)).encode('utf-8')
 
 
+def heartbeat_key_name(prefix, server_kind, server_id):
+    return ('%s:%s:%s:alive' % (prefix, server_kind, server_id)).encode('utf-8')
+
+
 def rotated(l, places):
     places = places % len(l)
     return l[places:] + l[:places]
@@ -104,14 +108,10 @@ def rpush_ex(redis, key, value, ttl):
 
 class Client:
     def __init__(self, redis,
-                 name='',
-                 id='',
                  prefix='redis_rpc',
                  request_expire=REQUEST_EXPIRE,
                  blpop_timeout=BLPOP_TIMEOUT,
                  response_timeout=RESPONSE_TIMEOUT):
-        self._name = name
-        self._id = id
         self._redis = redis
         self._prefix = prefix
         self._expire = request_expire
@@ -160,24 +160,23 @@ class Client:
         return self.response(func_name, req_id,
                              response_timeout=response_timeout)
 
-    def get_online_servers(self, server_id=None):
-        if server_id is None:
-            match = '{}:{}:*:alive'.format(self._prefix, self._name)
-        else:
-            match = '{}:{}:{}:alive'.format(self._prefix, self._name, server_id)
+    def get_online_servers(self, kind):
+        match = heartbeat_key_name(self._prefix, kind, '*')
         result = []
         for key in self._redis.scan_iter(match=match):
             result.append(key.decode().split(':')[-2])
         return result
 
-    def is_online(self, server_id=None):
-        return len(self.get_online_servers(server_id)) > 0
+    def is_server_online(self, kind, id=None):
+        servers = self.get_online_servers(kind)
+        if id is not None:
+            return id in servers
+        else:
+            return len(servers) > 0
 
 
 class Server:
     def __init__(self, redis, func_map,
-                 name='',
-                 id='',
                  prefix='redis_rpc',
                  result_expire=RESULT_EXPIRE,
                  blpop_timeout=BLPOP_TIMEOUT,
@@ -185,8 +184,6 @@ class Server:
                  heartbeat_expire=HEARTBEAT_EXPIRE,
                  verbose=False,
                  limit=None):
-        self._name = name
-        self._id = id
         self._redis = redis
         self._prefix = prefix
         self._expire = result_expire
@@ -209,32 +206,37 @@ class Server:
         return list(self._queue_names)
 
     def serve(self, num_threads=1):
-        def _serve():
-            while not self._quit:
-                self.serve_one()
-
         with contextlib.ExitStack() as stack:
-            heartbeat_thread = threading.Thread(target=self.heartbeat)
-            heartbeat_thread.start()
-            stack.callback(heartbeat_thread.join)
             if num_threads == 1:
-                _serve()
+                self.simple_serve()
             else:
-                assert num_threads > 1
-                threads = [threading.Thread(target=_serve) for i in range(num_threads)]
+                threads = [threading.Thread(target=self.simple_serve)
+                           for i in range(num_threads)]
                 for t in threads:
                     t.start()
                     stack.callback(t.join)
 
-    def heartbeat(self):
+    def simple_serve(self):
+        while not self._quit:
+            self.serve_one()
+
+    @contextlib.contextmanager
+    def heartbeat_thread(self, kind, id):
+        thread = threading.Thread(target=self.heartbeat, args=(kind, id))
+        thread.start()
+        try:
+            yield
+        finally:
+            thread.join()
+
+    def heartbeat(self, kind, id):
+        key = heartbeat_key_name(self._prefix, kind, id)
         last = time.time() - self._heartbeat_period
         while not self._quit:
             now = time.time()
             remaining = last + self._heartbeat_period - now
             if remaining <= 0:
-                self._redis.set('{}:{}:{}:alive'.format(
-                    self._prefix, self._name, self._id), '1', ex=self._heartbeat_expire
-                )
+                self._redis.set(key, '1', ex=self._heartbeat_expire)
                 last = now
             else:
                 time.sleep(min(self._blpop_timeout, remaining))

@@ -8,11 +8,15 @@ from unittest.mock import Mock
 
 
 @contextmanager
-def rpc_server(redis, func_map, **kwargs):
+def rpc_server(redis, func_map, kind=None, id=None, **kwargs):
 
     def server():
         rpc = Server(redis, func_map, **kwargs)
-        rpc.serve()
+        if kind and id:
+            with rpc.heartbeat_thread(kind, id):
+                rpc.serve()
+        else:
+            rpc.serve()
 
     rpc_proc = Process(target=server)
     rpc_proc.start()
@@ -138,21 +142,21 @@ def test_override_response_timeout(redisdb):
 
 
 def test_heartbeat(redisdb):
-    cli = Client(redisdb, name='X', id='44')
+    cli = Client(redisdb)
     with rpc_server(
         redisdb,
         {'f': lambda x: x},
-        name='X', id='42',
         heartbeat_period=0.5,
-        heartbeat_expire=1
+        heartbeat_expire=1,
+        kind='X', id='42',
     ):
         time.sleep(0.2)  # Wait until heartbeat starts
-        assert cli.is_online()
-        assert cli.is_online(server_id='42')
-        assert not cli.is_online(server_id='43')
-        assert cli.get_online_servers() == ['42']
+        assert cli.is_server_online('X')
+        assert cli.is_server_online('X', '42')
+        assert not cli.is_server_online('X', '43')
+        assert cli.get_online_servers('X') == ['42']
         time.sleep(1)
-        assert cli.is_online()
+        assert cli.is_server_online('X')
     time.sleep(1.5)
-    assert not cli.is_online()
-    assert cli.get_online_servers() == []
+    assert not cli.is_server_online('X')
+    assert cli.get_online_servers('X') == []
