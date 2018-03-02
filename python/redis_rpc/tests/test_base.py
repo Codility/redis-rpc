@@ -150,7 +150,9 @@ def test_heartbeat(redisdb):
         assert cli.is_online()
         assert cli.is_online(server_id='42')
         assert not cli.is_online(server_id='43')
+        assert cli.get_online_servers() == ['42']
         time.sleep(1)
         assert cli.is_online()
     time.sleep(1.5)
     assert not cli.is_online()
+    assert cli.get_online_servers() == []
