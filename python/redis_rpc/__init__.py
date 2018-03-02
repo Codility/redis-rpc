@@ -19,8 +19,8 @@ BLPOP_TIMEOUT = 1
 RESPONSE_TIMEOUT = 1
 REQUEST_EXPIRE = 120
 RESULT_EXPIRE = 120
-HEARTBEAT_PERIOD = 3
-HEARTBEAT_EXPIRE = 5
+HEARTBEAT_PERIOD = 1
+HEARTBEAT_EXPIRE = 2
 
 
 class RPCTimeout(Exception):
@@ -110,8 +110,8 @@ class Client:
                  request_expire=REQUEST_EXPIRE,
                  blpop_timeout=BLPOP_TIMEOUT,
                  response_timeout=RESPONSE_TIMEOUT):
-        self.name = name
-        self.id = id
+        self._name = name
+        self._id = id
         self._redis = redis
         self._prefix = prefix
         self._expire = request_expire
@@ -162,11 +162,11 @@ class Client:
 
     def is_online(self, server_id=None):
         if server_id is not None:
-            key = '{}:{}:{}:alive'.format(self.prefix, self.name, server_id)
+            key = '{}:{}:{}:alive'.format(self._prefix, self._name, server_id)
             if self._redis.get(key):
                 return True
             return False
-        pattern = '{}:{}:*:alive'.format(self.prefix, self.name)
+        pattern = '{}:{}:*:alive'.format(self._prefix, self._name)
         for server in self._redis.scan_iter(match=pattern):
             return True
         return False
@@ -183,8 +183,8 @@ class Server:
                  heartbeat_expire=HEARTBEAT_EXPIRE,
                  verbose=False,
                  limit=None):
-        self.name = name
-        self.id = id
+        self._name = name
+        self._id = id
         self._redis = redis
         self._prefix = prefix
         self._expire = result_expire
@@ -211,7 +211,7 @@ class Server:
             while not self._quit:
                 self.serve_one()
 
-        heartbeat_thread = threading.Thread(target=heartbeat)
+        heartbeat_thread = threading.Thread(target=self.heartbeat)
         heartbeat_thread.start()
         if num_threads == 1:
             _serve()
@@ -227,7 +227,7 @@ class Server:
     def heartbeat(self):
         while not self._quit:
             self._redis.set('{}:{}:{}:alive'.format(
-                self.prefix, self.name, self.id), True, ex=self._heartbeat_expire
+                self._prefix, self._name, self._id), True, ex=self._heartbeat_expire
             )
             time.sleep(self._heartbeat_period)
 

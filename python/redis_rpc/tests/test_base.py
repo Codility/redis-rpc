@@ -146,10 +146,11 @@ def test_heartbeat(redisdb):
         heartbeat_period=0.5,
         heartbeat_expire=1
     ):
+        time.sleep(0.2)  # Wait until heartbeat starts
         assert cli.is_online()
-        assert cli.is_online(id='42')
-        assert not cli.is_online(id='43')
-        time.sleep(1.5)
+        assert cli.is_online(server_id='42')
+        assert not cli.is_online(server_id='43')
+        time.sleep(1)
         assert cli.is_online()
     time.sleep(1.5)
     assert not cli.is_online()
