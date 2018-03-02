@@ -53,8 +53,8 @@ immediately.
 
 Queues:
 
-- "{prefix}:{func}:calls"
-- "{prefix}:{func}:result:{call-id}"
+- `{prefix}:{func}:calls`
+- `{prefix}:{func}:result:{call-id}`
 
 Call message:
 
@@ -79,3 +79,10 @@ Result message:
     # or, if finished with an error
     {"ts": "{time-stamp-iso8601}",
      "err": "{human-readable description of the error}"}
+
+Heartbeat
+---------
+
+The server also implements a heartbeat thread. To check if a server is online,
+look for the `{prefix}:{server_name}:{server_id}:alive` key in Redis. When the
+server goes offline, its key expires.
